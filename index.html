@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>KRR Chat — GPU-Accelerated Word-Level Language Model</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:'Inter',system-ui,sans-serif;background:#0f172a;color:#e2e8f0;min-height:100vh;display:flex;flex-direction:column}
+    .hd{padding:.8rem 1.2rem;border-bottom:1px solid #1e293b}
+    .hd h1{font-size:1rem;font-weight:700;background:linear-gradient(90deg,#22d3ee,#60a5fa,#f59e0b);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+    .hd p{font-size:.68rem;color:#475569;margin-top:.15rem}
+    .hd .gpu{font-size:.6rem;padding:.1rem .4rem;border-radius:.2rem;background:#22d3ee15;color:#22d3ee;border:1px solid #22d3ee30;margin-left:.4rem;vertical-align:middle}
+    .prog{height:2px;background:#1e293b}.prog-bar{height:100%;background:linear-gradient(90deg,#22d3ee,#f59e0b);width:0%;transition:width .3s}
+    .st{padding:.3rem 1.2rem;font-size:.66rem;color:#334155}.st.t{color:#f59e0b}.st.r{color:#22d3ee}
+    .chat{flex:1;overflow-y:auto;padding:.8rem 1.2rem;display:flex;flex-direction:column;gap:.6rem}
+    .m{max-width:88%;padding:.5rem .9rem;border-radius:.9rem;font-size:.85rem;line-height:1.55;word-break:break-word}
+    .m.u{align-self:flex-end;background:#1e3a5f;border-bottom-right-radius:.2rem}
+    .m.b{align-self:flex-start;background:#1e293b;border-bottom-left-radius:.2rem;color:#cbd5e1}
+    .m.s{align-self:center;background:none;color:#475569;font-size:.7rem;text-align:center;padding:.4rem;max-width:95%}
+    .m .sd{color:#22d3ee;font-weight:600}
+    .m .gn{color:#94a3b8}
+    .bd{display:inline-block;font-size:.55rem;background:#1e293b;color:#475569;padding:.1rem .35rem;border-radius:.2rem;margin-left:.3rem;vertical-align:middle}
+    .ip{padding:.6rem .8rem;border-top:1px solid #1e293b;display:flex;gap:.4rem}
+    .ip input{flex:1;background:#1e293b;border:1px solid #334155;color:#e2e8f0;padding:.55rem .9rem;border-radius:.7rem;font-size:.85rem;outline:none}
+    .ip input:focus{border-color:#22d3ee}
+    .ip input::placeholder{color:#475569}
+    .ip button{background:#22d3ee;color:#0f172a;border:none;padding:.55rem 1rem;border-radius:.7rem;font-weight:600;font-size:.82rem;cursor:pointer}
+    .ip button:hover{background:#06b6d4}
+    .ip button:disabled{background:#334155;color:#64748b;cursor:not-allowed}
+    .ct{padding:.4rem 1.2rem;border-top:1px solid #1e293b;display:flex;flex-wrap:wrap;gap:.6rem;align-items:center;font-size:.68rem;color:#64748b}
+    .ct label{display:flex;align-items:center;gap:.25rem}
+    .ct input[type=range]{width:70px;accent-color:#22d3ee}
+    .ct .v{color:#22d3ee;font-family:monospace;min-width:2rem}
+    .ex{display:flex;flex-wrap:wrap;gap:.3rem;padding:.3rem 1.2rem;border-top:1px solid #0f172a}
+    .ex button{background:#1e293b;border:1px solid #334155;color:#94a3b8;padding:.25rem .6rem;border-radius:.5rem;font-size:.7rem;cursor:pointer}
+    .ex button:hover{border-color:#22d3ee;color:#22d3ee}
+    .timer{font-family:monospace;color:#f59e0b;font-size:.65rem}
+  </style>
+</head>
+<body>
+<div class="hd">
+  <h1>&#x03BB; KRR Chat <span class="gpu" id="gpuBadge">checking GPU...</span></h1>
+  <p>Word-level Kernel Ridge Regression. Training runs on your <strong style="color:#94a3b8">GPU</strong> via TensorFlow.js WebGL — no NVIDIA required.</p>
+</div>
+<div class="prog"><div id="pb" class="prog-bar"></div></div>
+<div id="st" class="st t">Loading TensorFlow.js...</div>
+<div id="chat" class="chat"></div>
+<div class="ex" id="examples"></div>
+<div class="ct">
+  <label>Temp <input type="range" id="tmp" min="0" max="0.8" step="0.05" value="0"><span class="v" id="tv">0.00</span></label>
+  <label>Top-K <input type="range" id="topk" min="1" max="20" step="1" value="1"><span class="v" id="kv">1</span></label>
+  <label>Min words <input type="range" id="mw" min="10" max="250" step="5" value="40"><span class="v" id="wv">40</span></label>
+  <label style="margin-left:auto;color:#334155" id="nfo"></label>
+</div>
+<div class="ip">
+  <input type="text" id="in" placeholder="Ask something... (e.g. 'What is an eigenvalue?', 'Explain kernel ridge regression')" disabled>
+  <button id="go" disabled>&#x27A4;</button>
+</div>
+
+<script>
+(function(){
+'use strict';
+
+// ================================================================
+// CORPUS
+// ================================================================
+var RAW =
+"in linear algebra an eigenvector of a linear transformation is a nonzero vector that changes at most by a constant factor when that linear transformation is applied to it . the corresponding eigenvalue is the factor by which the eigenvector is scaled . "+
+"geometrically a transformation matrix rotates stretches or shears the vectors it acts upon . an eigenvector is a vector whose direction remains unchanged by the transformation . the eigenvalue gives the factor by which the eigenvector is stretched or compressed . "+
+"the prefix eigen is german for own or characteristic . eigenvalues and eigenvectors are fundamental concepts in linear algebra . they reveal the internal structure of a matrix . "+
+"the characteristic polynomial of a matrix is obtained by computing the determinant of the matrix minus lambda times the identity . the roots of this polynomial are the eigenvalues . for a two by two matrix this gives a quadratic equation that can be solved by hand . "+
+"symmetric matrices have a special property . all their eigenvalues are real numbers and their eigenvectors are orthogonal . this means the eigenvectors form a natural coordinate system for the matrix . "+
+"the spectral theorem states that every symmetric matrix can be written as a sum of its eigenvalues times the outer products of its eigenvectors . this is called the spectral decomposition . it reveals the fundamental structure of the matrix . "+
+"principal component analysis uses the spectral theorem to find the directions of maximum variance in a dataset . these directions are the eigenvectors of the covariance matrix with the largest eigenvalues . "+
+"in quantum mechanics every observable quantity is associated with a linear operator . the eigenvalues of the operator represent the possible measurement outcomes . when a measurement is performed the system collapses into one of the eigenstates . "+
+"the energy levels of an atom are the eigenvalues of the hamiltonian operator . the hydrogen atom has energy levels proportional to one over n squared . the schrodinger equation is itself an eigenvalue equation . "+
+"every quantum state can be expressed as a superposition of eigenstates . this is the foundation of quantum mechanics . the wave function describes the probability amplitude for each eigenstate . "+
+"the fourier transform decomposes a signal into its constituent frequencies . the sine and cosine functions are eigenfunctions of the second derivative operator . the fourier series is an eigenfunction expansion . "+
+"this creates a deep connection between signal processing and quantum mechanics . both use eigenvalue decomposition to analyze the structure of functions and operators . "+
+"google pagerank is an eigenvalue problem . the importance of a webpage is determined by the dominant eigenvector of the google matrix . a random surfer model describes a user who clicks on links with some probability and teleports to a random page otherwise . "+
+"the power iteration algorithm computes the pagerank vector by repeatedly multiplying the google matrix with the current estimate . convergence typically requires about fifty iterations even for billions of web pages . "+
+"larry page and sergey brin developed pagerank at stanford university . the algorithm transformed web search and became the foundation of one of the most valuable companies in history . "+
+"kernel ridge regression is a powerful machine learning method . it uses kernel functions to perform nonlinear regression . the kernel trick replaces the inner product matrix with a kernel matrix . "+
+"this allows the algorithm to operate in a potentially infinite dimensional feature space without explicitly computing the features . the gaussian kernel measures the similarity between two data points using a bell shaped function . "+
+"the bandwidth parameter sigma controls how quickly the similarity decays with distance . a small sigma means only nearby points are considered similar . a large sigma means even distant points influence each other . "+
+"the representer theorem is a fundamental result in kernel methods . it states that the optimal solution of kernel ridge regression can always be written as a linear combination of kernel evaluations at the training points . "+
+"this means the training data is the model . there are no abstract parameters . there are no weight matrices . there are no hidden layers . the function is completely determined by the data points and their kernel similarities . "+
+"the universal approximation theorem proved by cybenko in nineteen eighty nine shows that neural networks with a single hidden layer can approximate any continuous function to arbitrary accuracy . "+
+"similarly kernel ridge regression with a universal kernel such as the gaussian kernel can also approximate any continuous function . both function classes are dense in the space of continuous functions . they are equally powerful in theory . "+
+"the neural tangent kernel discovered by jacot gabriel and hongler provides a deep connection between neural networks and kernel methods . in the idealized limit of infinite width a neural network trained by gradient descent behaves exactly like kernel ridge regression . "+
+"this is not a metaphor . it is a rigorous mathematical theorem . the eigenvalues of the neural tangent kernel determine which functions the network learns quickly and which it learns slowly . "+
+"the neumann series is a fundamental tool in linear algebra . it states that the sum of all powers of a matrix converges to the inverse of the identity minus that matrix . this requires all eigenvalues to have magnitude less than one . "+
+"the iterative residual correction method uses this fact . instead of inverting a matrix directly you compute the solution by repeatedly correcting your error . each iteration reduces the residual . the convergence rate depends on the eigenvalues . "+
+"regularization prevents overfitting in machine learning . ridge regression adds a penalty term lambda times the squared norm of the coefficients . this shrinks the contributions from small eigenvalue directions . "+
+"a remarkable equivalence exists between ridge regularization and early stopping . the ridge parameter lambda is approximately equal to one divided by the number of iterations . this means regularization is the natural consequence of stopping before convergence . "+
+"large eigenvalues correspond to signal in the data . they are captured quickly by the iterative method . small eigenvalues correspond to noise . they require many iterations to capture . stopping early means learning signal and ignoring noise . "+
+"in computer graphics the radiosity equation describes global illumination . light bounces between surfaces and each bounce adds realism . the radiosity equation is solved using the neumann series . each term represents one additional light bounce . "+
+"the transfer matrix in radiosity is substochastic because some energy is absorbed at each surface . adding an absorber dimension makes it stochastic . a stochastic matrix is a markov chain transition matrix . "+
+"the equilibrium of a markov chain is the dominant eigenvector with eigenvalue one . this connects computer graphics to probability theory through eigenvalue decomposition . "+
+"attention mechanisms in transformer models compute similarity matrices between tokens . the softmax normalized attention matrix is essentially a kernel matrix . each attention head computes a different kernel . "+
+"stacking multiple layers of attention is analogous to iterating the residual correction with different kernels at each step . the skip connections in transformers add the correction to the current estimate . "+
+"transformers are iterative kernel ridge regression with learned kernels . this insight connects the entire chain from simple linear regression through eigenvalues and kernel methods all the way to modern language models . "+
+"random fourier features approximate kernel evaluations using random projections . this reduces the computational cost from cubic to linear in the number of data points . the performer architecture uses this trick to make attention linear . "+
+"the connection between quantum mechanics and artificial intelligence runs deep . the propagator in quantum mechanics and the kernel in machine learning share the same mathematical structure . "+
+"both are sums over eigenfunctions weighted by eigenvalues . eigenvalues are the universal mathematical language for understanding complex systems . "+
+"machine learning is fundamentally about finding patterns in data . the eigenvalue structure of the data determines which patterns are easy to learn and which are hard . "+
+"a model that captures the large eigenvalue directions captures the signal . a model that also fits the small eigenvalue directions overfits the noise . the art of machine learning is knowing when to stop . "+
+"the condition number of a matrix is the ratio of its largest to its smallest eigenvalue . a large condition number means the matrix is ill conditioned . small perturbations in the input cause large changes in the output . "+
+"this is why direct matrix inversion is numerically unstable . the iterative approach avoids this problem because it never computes the inverse directly . it only multiplies and adds . "+
+"eigenvalues appear everywhere in science and engineering . in structural analysis they determine the natural frequencies of a bridge or building . in population dynamics they determine growth rates . "+
+"in control theory eigenvalues determine whether a system is stable or unstable . in quantum chemistry they determine molecular orbitals and bonding energies . "+
+"the beauty of eigenvalue theory is its universality . the same mathematical framework applies to vibrating strings quantum particles web pages neural networks and everything in between . "+
+// === ADDITIONAL TRAINING DATA ===
+"the projection of a vector onto a subspace is the closest point in that subspace . the error between the original vector and its projection is perpendicular to the subspace . this is the fundamental idea behind least squares regression . "+
+"the normal equation states that the best fit coefficients satisfy the equation x transpose x times c equals x transpose y . the solution is c equals the inverse of x transpose x times x transpose y . "+
+"matrix inversion is expensive . it costs order n cubed operations and is numerically unstable for ill conditioned matrices . the iterative approach replaces inversion with repeated error correction . "+
+"the dot product of two vectors measures their similarity . if the dot product is zero the vectors are perpendicular . if it is positive they point in similar directions . if negative they point in opposite directions . "+
+"a kernel function computes the similarity between two data points without explicitly mapping them to a high dimensional feature space . this is known as the kernel trick . "+
+"support vector machines use kernel functions for classification . they find the hyperplane that maximizes the margin between classes . the support vectors are the data points closest to the decision boundary . "+
+"gaussian processes are the probabilistic version of kernel ridge regression . they provide not only predictions but also uncertainty estimates . the covariance function is the kernel . "+
+"the bias variance tradeoff is central to machine learning . a simple model has high bias but low variance . a complex model has low bias but high variance . the optimal model balances both . "+
+"cross validation is a technique for estimating the generalization performance of a model . the data is split into training and validation sets . the model is trained on the training set and evaluated on the validation set . "+
+"gradient descent is the most common optimization algorithm in machine learning . it updates the parameters in the direction of the negative gradient of the loss function . the learning rate controls the step size . "+
+"stochastic gradient descent processes the data in small batches rather than the entire dataset at once . this makes it much faster for large datasets . the noise from random sampling can actually help escape local minima . "+
+"backpropagation is the algorithm used to compute gradients in neural networks . it applies the chain rule of calculus layer by layer from the output back to the input . this is why it is called backpropagation . "+
+"convolutional neural networks are specialized for image processing . they use convolutional filters that slide across the input and detect local patterns like edges and textures . deeper layers detect more abstract features . "+
+"recurrent neural networks process sequential data like text and time series . they maintain a hidden state that is updated at each time step . long short term memory networks solve the vanishing gradient problem . "+
+"the transformer architecture replaced recurrent networks for most natural language processing tasks . it uses self attention to process all tokens in parallel rather than sequentially . this enables much faster training . "+
+"large language models like gpt are transformers trained on massive amounts of text data . they learn to predict the next word given the previous context . the emergent abilities of large language models surprised the research community . "+
+"the loss function measures how wrong the model predictions are . for regression the most common loss is the mean squared error . for classification it is the cross entropy loss . "+
+"batch normalization stabilizes the training of deep neural networks by normalizing the activations within each layer . this allows higher learning rates and faster convergence . "+
+"dropout is a regularization technique that randomly sets some neurons to zero during training . this prevents the network from relying too heavily on any single neuron and improves generalization . "+
+"transfer learning uses a model trained on one task as a starting point for another task . this is especially useful when the target task has limited training data . fine tuning adjusts the pretrained weights for the new task . "+
+"the curse of dimensionality describes the problems that arise when working with high dimensional data . distances become less meaningful and data becomes sparse . kernel methods and dimensionality reduction help address this . "+
+"an orthogonal matrix preserves lengths and angles . its transpose equals its inverse . the eigenvectors of a symmetric matrix form an orthogonal basis . this is why principal component analysis works so well . "+
+"the singular value decomposition factorizes any matrix into three components . it generalizes the eigenvalue decomposition to non square matrices . the singular values are the square roots of the eigenvalues of the matrix times its transpose . "+
+"the rank of a matrix is the number of linearly independent rows or columns . it equals the number of nonzero singular values . a low rank matrix can be efficiently approximated by keeping only the largest singular values . "+
+"dimensionality reduction techniques like principal component analysis and autoencoders compress high dimensional data into a lower dimensional representation . the key idea is to preserve the most important structure while discarding noise . "+
+"the information bottleneck theory suggests that deep neural networks learn by compressing the input into a compact representation that retains only the information relevant to the output . this is related to regularization and eigenvalue filtering . "+
+"ensemble methods combine multiple models to achieve better performance than any single model . random forests average many decision trees . boosting trains models sequentially with each model correcting the errors of the previous one . "+
+"the no free lunch theorem states that no single algorithm is best for all problems . the choice of algorithm depends on the structure of the data and the nature of the task . "+
+"the manifold hypothesis states that high dimensional data often lies on or near a low dimensional manifold . this is why dimensionality reduction works and why neural networks can learn meaningful representations . "+
+"bayesian methods treat model parameters as random variables and compute posterior distributions given the data . this provides a principled framework for uncertainty quantification and model selection . "+
+"the kernel matrix is always positive semidefinite . this means all its eigenvalues are nonnegative . this is guaranteed by mercer theorem which characterizes valid kernel functions . "+
+"the spectral gap of a stochastic matrix is the difference between its largest eigenvalue and its second largest eigenvalue . a large spectral gap means the markov chain mixes quickly and the power iteration converges fast . "+
+"eigenvalue perturbation theory studies how eigenvalues change when a matrix is slightly modified . the davis kahan theorem bounds the rotation of eigenvectors under perturbation . this is important for the stability of algorithms . "+
+"numerical linear algebra is the study of algorithms for matrix computations . the most important operations are matrix multiplication solving linear systems and computing eigenvalues . modern implementations use highly optimized libraries . "+
+"the fast fourier transform computes the discrete fourier transform in order n log n operations instead of n squared . this made spectral analysis practical for large datasets and revolutionized signal processing . "+
+"quantum computing uses quantum mechanical phenomena to perform computation . quantum bits or qubits can exist in a superposition of states . quantum algorithms like shor algorithm exploit eigenvalue structure for factoring large numbers .";
+
+
+var words = RAW.toLowerCase().split(/\s+/);
+var W2I = {}, I2W = {}, VOCAB = 0;
+for (var i = 0; i < words.length; i++) { if (W2I[words[i]] === undefined) { W2I[words[i]] = VOCAB; I2W[VOCAB] = words[i]; VOCAB++; } }
+
+var CTX = 5, HASH = 128, N_BI = 3, FEAT = CTX*HASH + N_BI*HASH, D = 2048, SIGMA = 1.5, LAM = 0.008;
+
+function hashW(w) { var h=0; for(var i=0;i<w.length;i++) h=((h*31)+w.charCodeAt(i))|0; return((h%HASH)+HASH)%HASH; }
+function hashP(a,b) { var s=a+'|'+b; var h=0; for(var i=0;i<s.length;i++) h=((h*37)+s.charCodeAt(i))|0; return((h%HASH)+HASH)%HASH; }
+
+function encodeCtx(ctx) {
+  var vec = new Float32Array(FEAT);
+  for (var p=0;p<CTX;p++) { var w=ctx[p]||''; if(!w)continue; var wt=0.4+0.6*(p/(CTX-1)); vec[p*HASH+hashW(w)]+=wt; if(W2I[w]!==undefined) vec[p*HASH+(W2I[w]%HASH)]+=wt*0.5; }
+  var bo=CTX*HASH;
+  for (var b=0;b<N_BI;b++) { var p1=CTX-N_BI-1+b,p2=p1+1; if(p1<0||!ctx[p1]||!ctx[p2])continue; vec[bo+b*HASH+hashP(ctx[p1],ctx[p2])]=1.0; }
+  return vec;
+}
+
+// === UI ===
+var pb=document.getElementById('pb'),stEl=document.getElementById('st'),chatEl=document.getElementById('chat');
+var inEl=document.getElementById('in'),goBtn=document.getElementById('go');
+var tmpSl=document.getElementById('tmp'),tvEl=document.getElementById('tv');
+var topkSl=document.getElementById('topk'),kvEl=document.getElementById('kv');
+var mwSl=document.getElementById('mw'),wvEl=document.getElementById('wv');
+var nfoEl=document.getElementById('nfo'),exEl=document.getElementById('examples'),gpuBdg=document.getElementById('gpuBadge');
+tmpSl.oninput=function(){tvEl.textContent=parseFloat(tmpSl.value).toFixed(2);};
+topkSl.oninput=function(){kvEl.textContent=topkSl.value;};
+mwSl.oninput=function(){wvEl.textContent=mwSl.value;};
+
+function setSt(msg,cls,pct) { stEl.textContent=msg; stEl.className='st '+(cls||''); if(pct!==undefined) pb.style.width=pct+'%'; }
+function addMsg(txt,cls) { var d=document.createElement('div'); d.className='m '+cls; if(typeof txt==='string') d.textContent=txt; else d.appendChild(txt); chatEl.appendChild(d); chatEl.scrollTop=chatEl.scrollHeight; return d; }
+
+// === GPU TRAINING WITH TENSORFLOW.JS ===
+var W_cpu = null; // Float64Array D×VOCAB for fast CPU inference
+
+async function trainGPU() {
+  await tf.ready();
+  var backend = tf.getBackend();
+  gpuBdg.textContent = backend === 'webgl' ? 'WebGL GPU' : backend === 'webgpu' ? 'WebGPU' : backend;
+  gpuBdg.style.borderColor = backend.includes('web') ? '#22d3ee50' : '#f59e0b50';
+  gpuBdg.style.color = backend.includes('web') ? '#22d3ee' : '#f59e0b';
+
+  setSt('Building dataset (' + words.length + ' tokens, ' + VOCAB + ' unique words)...', 't', 10);
+  await tf.nextFrame();
+
+  var t0 = performance.now();
+  var N = words.length - CTX;
+
+  // === Step 1: Build feature matrix X on CPU (sparse, fast) ===
+  var X_data = new Float32Array(N * FEAT);
+  var Y_data = new Float32Array(N * VOCAB); // one-hot
+  for (var i = 0; i < N; i++) {
+    var ctx = words.slice(i, i + CTX);
+    var vec = encodeCtx(ctx);
+    X_data.set(vec, i * FEAT);
+    Y_data[i * VOCAB + W2I[words[i + CTX]]] = 1;
+  }
+  var tFeat = ((performance.now() - t0)/1000).toFixed(2);
+  setSt('Features built in ' + tFeat + 's. Generating random projections on GPU...', 't', 20);
+  await tf.nextFrame();
+
+  // === Step 2: RFF on GPU — Z = cos(X @ omega + bias) * sqrt(2/D) ===
+  var tGpu = performance.now();
+
+  var X_tf = tf.tensor2d(X_data, [N, FEAT]);
+  X_data = null; // free
+
+  // Random projection matrix (FEAT × D) and bias (D)
+  var omega_tf = tf.randomNormal([FEAT, D], 0, 1/SIGMA);
+  var bias_tf = tf.randomUniform([1, D], 0, 2 * Math.PI);
+  var scale = Math.sqrt(2.0 / D);
+
+  // Z = sqrt(2/D) * cos(X @ omega + bias)  — ALL ON GPU
+  var Z_tf = tf.tidy(function() {
+    var proj = tf.matMul(X_tf, omega_tf);        // N×D  — GPU matmul!
+    var shifted = tf.add(proj, bias_tf);           // N×D
+    return tf.mul(tf.cos(shifted), scale);         // N×D
+  });
+  X_tf.dispose();
+
+  var tRff = ((performance.now() - tGpu)/1000).toFixed(2);
+  setSt('RFF done in ' + tRff + 's (GPU). Computing Z^TZ (' + D + '\u00D7' + D + ') on GPU...', 't', 40);
+  await tf.nextFrame();
+
+  // === Step 3: Z^TZ + λI on GPU ===
+  var tSolve = performance.now();
+  var Y_tf = tf.tensor2d(Y_data, [N, VOCAB]);
+  Y_data = null;
+
+  var ZTZ = tf.tidy(function() {
+    var ztx = tf.matMul(Z_tf, Z_tf, true, false);  // D×D  — GPU matmul!
+    var reg = tf.mul(tf.eye(D), LAM);
+    return tf.add(ztx, reg);
+  });
+
+  // Z^TY on GPU
+  var ZTY = tf.matMul(Z_tf, Y_tf, true, false); // D×VOCAB  — GPU!
+  Z_tf.dispose(); Y_tf.dispose();
+
+  var tMat = ((performance.now() - tSolve)/1000).toFixed(2);
+  setSt('Z^TZ in ' + tMat + 's (GPU). Solving ' + D + '\u00D7' + D + ' system...', 't', 60);
+  await tf.nextFrame();
+
+  // === Step 4: Download to CPU and solve via Gaussian elimination ===
+  // (tf.linalg.solve is not available in browser tf.js — but the solve
+  //  is only 2048×2048, fast on CPU. The GPU did the heavy lifting above.)
+  var tSolve2 = performance.now();
+  setSt('Downloading matrices from GPU...', 't', 68);
+  await tf.nextFrame();
+
+  var ZTZ_raw = await ZTZ.data();  // Float32Array D*D
+  var ZTY_raw = await ZTY.data();  // Float32Array D*VOCAB
+  ZTZ.dispose(); ZTY.dispose();
+
+  setSt('Solving ' + D + '\u00D7' + D + ' system on CPU (Gauss elimination)...', 't', 72);
+  await tf.nextFrame();
+
+  // Augmented matrix [ZTZ | ZTY] and Gaussian elimination
+  var cols = D + VOCAB;
+  var M = new Float64Array(D * cols);
+  for (var i = 0; i < D; i++) {
+    for (var j = 0; j < D; j++) M[i*cols+j] = ZTZ_raw[i*D+j];
+    for (var j = 0; j < VOCAB; j++) M[i*cols+D+j] = ZTY_raw[i*VOCAB+j];
+  }
+  ZTZ_raw = null; ZTY_raw = null;
+
+  for (var col = 0; col < D; col++) {
+    var mr=col, mv=Math.abs(M[col*cols+col]);
+    for (var r=col+1; r<D; r++) { var av=Math.abs(M[r*cols+col]); if(av>mv){mv=av;mr=r;} }
+    if (mr!==col) for(var j=col;j<cols;j++){var t=M[col*cols+j];M[col*cols+j]=M[mr*cols+j];M[mr*cols+j]=t;}
+    var piv=M[col*cols+col]; if(Math.abs(piv)<1e-14) continue;
+    for (var r=col+1; r<D; r++) {
+      var f=M[r*cols+col]/piv; if(Math.abs(f)<1e-14) continue;
+      for(var j=col;j<cols;j++) M[r*cols+j]-=f*M[col*cols+j];
+    }
+    if (col%400===0) { pb.style.width=(72+13*col/D)+'%'; }
+  }
+  // Back substitution → W_cpu (D×VOCAB)
+  W_cpu = new Float64Array(D * VOCAB);
+  for (var i=D-1; i>=0; i--) {
+    var piv=M[i*cols+i]; if(Math.abs(piv)<1e-14) continue;
+    for (var v=0; v<VOCAB; v++) {
+      var val=M[i*cols+D+v];
+      for(var j=i+1;j<D;j++) val-=M[i*cols+j]*W_cpu[j*VOCAB+v];
+      W_cpu[i*VOCAB+v]=val/piv;
+    }
+  }
+  M = null;
+
+  var tSolveTime = ((performance.now() - tSolve2)/1000).toFixed(2);
+  setSt('Solved in ' + tSolveTime + 's (CPU). Testing...', 't', 88);
+  await tf.nextFrame();
+
+  // Keep omega and bias on CPU for inference
+  var omega_raw = await omega_tf.data();
+  var bias_raw = await bias_tf.data();
+  omega_tf.dispose(); bias_tf.dispose();
+
+  // Store for CPU inference
+  window._omega = omega_raw; // Float32Array FEAT×D
+  window._bias = bias_raw;   // Float32Array D
+
+  var totalTime = ((performance.now() - t0)/1000).toFixed(1);
+
+  // === Quick accuracy test ===
+  setSt('Testing accuracy...', 't', 92);
+  await tf.nextFrame();
+
+  var correct = 0, top3 = 0, total = 0;
+  var testStart = Math.max(0, words.length - CTX - 300);
+  for (var i = testStart; i < words.length - CTX; i++) {
+    var scores = predictScores(words.slice(i, i + CTX));
+    var target = W2I[words[i + CTX]];
+    var best = 0; for (var v = 1; v < VOCAB; v++) if (scores[v] > scores[best]) best = v;
+    if (best === target) correct++;
+    // top-3
+    var s3 = []; for (var v = 0; v < VOCAB; v++) s3.push({s:scores[v],i:v});
+    s3.sort(function(a,b){return b.s-a.s;});
+    if (s3[0].i===target||s3[1].i===target||s3[2].i===target) top3++;
+    total++;
+  }
+  var acc1 = (100*correct/total).toFixed(0);
+  var acc3 = (100*top3/total).toFixed(0);
+
+  pb.style.width = '100%';
+  setSt('Ready \u2014 ' + words.length + ' tokens, ' + VOCAB + ' words, D=' + D + ' | GPU training: ' + totalTime + 's | top-1=' + acc1 + '% top-3=' + acc3 + '%', 'r');
+  nfoEl.innerHTML = 'vocab='+VOCAB+' · top-1='+acc1+'% · top-3='+acc3+'% · <span class="timer">GPU '+totalTime+'s</span>';
+  inEl.disabled=false; goBtn.disabled=false; inEl.focus();
+  addMsg('I\u2019m a mini language model built on Kernel Ridge Regression \u2014 no neural network, just eigenvalues & matrix math. Trained on your GPU (' + backend + ') in ' + totalTime + 's on ' + words.length + ' tokens. Ask me about eigenvalues, kernel methods, quantum mechanics, or machine learning!', 's');
+
+  ['What is an eigenvalue?','Explain kernel ridge regression','How does PageRank work?','What is the neumann series?','Why do neural networks work?','What is regularization?','Explain the kernel trick','What is the spectral theorem?','How does attention work?'].forEach(function(ex){
+    var btn=document.createElement('button'); btn.textContent=ex;
+    btn.onclick=function(){inEl.value=ex;handleSend();}; exEl.appendChild(btn);
+  });
+}
+
+// === CPU INFERENCE (fast — no tf.js overhead per prediction) ===
+function rffCPU(vec) {
+  var z = new Float32Array(D);
+  var sc = Math.sqrt(2.0/D);
+  var nz = []; for (var k=0;k<FEAT;k++) if (vec[k]!==0) nz.push(k);
+  var om = window._omega, bi = window._bias;
+  for (var j=0;j<D;j++) {
+    var dot=0; for(var ni=0;ni<nz.length;ni++){var k=nz[ni];dot+=vec[k]*om[k*D+j];}
+    z[j]=Math.cos(dot+bi[j])*sc;
+  }
+  return z;
+}
+
+function predictScores(contextWords) {
+  var ctx=contextWords.slice(-CTX); while(ctx.length<CTX)ctx.unshift('');
+  var z=rffCPU(encodeCtx(ctx));
+  var scores=new Float64Array(VOCAB);
+  for(var j=0;j<D;j++){var zj=z[j];if(Math.abs(zj)<1e-8)continue;for(var v=0;v<VOCAB;v++)scores[v]+=zj*W_cpu[j*VOCAB+v];}
+  return scores;
+}
+
+function predictWord(contextWords,temperature,topK,recentWords) {
+  var scores = predictScores(contextWords);
+  if(recentWords)for(var r=0;r<recentWords.length;r++){var ri=W2I[recentWords[r]];if(ri!==undefined)scores[ri]*=0.25;}
+  var indexed=[]; for(var v=0;v<VOCAB;v++)indexed.push({s:scores[v],i:v});
+  indexed.sort(function(a,b){return b.s-a.s;});
+  var top=indexed.slice(0,topK); var maxS=top[0].s,sum=0;
+  for(var k=0;k<top.length;k++){top[k].p=Math.exp((top[k].s-maxS)/Math.max(temperature,0.005));sum+=top[k].p;}
+  for(var k=0;k<top.length;k++)top[k].p/=sum;
+  var r=Math.random(),c=0;
+  for(var k=0;k<top.length;k++){c+=top[k].p;if(r<c)return I2W[top[k].i];}
+  return I2W[top[top.length-1].i];
+}
+
+// === CHAT ===
+function handleSend() {
+  var userText=inEl.value.trim(); if(!userText||!W_cpu)return; inEl.value='';
+  addMsg(userText,'u');
+
+  // Q&A wrapper: turn user input into a completion prompt
+  // The model is a completion model, so we steer it into answering
+  var prompt = userText.toLowerCase().replace(/[?!]+$/,'');
+  // Heuristic: if it looks like a question, prepend context
+  var promptWords;
+  if (/^(what|why|how|who|where|when|is|are|do|does|can|could|explain|tell|describe)/.test(prompt)) {
+    // "what is an eigenvalue" → "an eigenvalue is"
+    prompt = prompt.replace(/^what (is|are) (an? |the )?/i, '$2').replace(/^(why|how|explain|tell me about|describe) /i, '');
+    promptWords = prompt.split(/\s+/);
+    // Append "is" or "are" to guide completion
+    var lastW = promptWords[promptWords.length-1];
+    if (lastW !== 'is' && lastW !== 'are' && lastW !== '.') {
+      promptWords.push(lastW.endsWith('s') ? 'are' : 'is');
+    }
+  } else {
+    promptWords = prompt.split(/\s+/);
+  }
+
+  var temp=parseFloat(tmpSl.value),topK=parseInt(topkSl.value),minW=parseInt(mwSl.value);
+  var allWords=promptWords.slice(),recent=[];
+
+  var container=document.createDocumentFragment();
+  var genSpan=document.createElement('span');genSpan.className='gn';
+  container.appendChild(genSpan);
+  var botEl=addMsg(container,'b');
+  var wi=0, hardMax=250, hitSentenceEnd=false;
+
+  function step(){
+    // Stop condition: after minW words, stop at next sentence end (.)
+    // Hard stop at hardMax regardless
+    if (wi >= hardMax) { finish(); return; }
+    if (wi >= minW && hitSentenceEnd) { finish(); return; }
+
+    var next=predictWord(allWords,temp,topK,recent);
+    allWords.push(next); recent.push(next); if(recent.length>10)recent.shift();
+
+    if (next === '.') hitSentenceEnd = true;
+
+    genSpan.textContent += (wi>0?' ':'') + next;
+    wi++; chatEl.scrollTop=chatEl.scrollHeight;
+    setTimeout(step, (next==='.')?60:20);
+  }
+
+  function finish() {
+    var badge=document.createElement('span');badge.className='bd';
+    badge.textContent='KRR\u00B7'+wi+' words\u00B7D='+D;
+    botEl.appendChild(badge);
+  }
+
+  setTimeout(step,100);
+}
+goBtn.onclick=handleSend; inEl.onkeydown=function(e){if(e.key==='Enter')handleSend();};
+
+// === GO ===
+trainGPU().catch(function(err) {
+  setSt('Error: ' + err.message, '', 0);
+  console.error(err);
+});
+})();
+</script>
+</body>
+</html>
