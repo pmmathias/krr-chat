@@ -6,78 +6,85 @@
 
 ## What is this?
 
-A word-level language model that runs entirely in your browser. It predicts the next word using Kernel Ridge Regression with Random Fourier Features — the same mathematical chain described in the [Eigenvalues & AI](https://ki-mathias.de/eigenwerte.html) blog post.
+A dual-model language chatbot that runs entirely in your browser. It answers questions about eigenvalues, kernel methods, quantum mechanics, and machine learning using Kernel Ridge Regression with Random Fourier Features — the same mathematical chain described in the [Eigenvalues & AI](https://ki-mathias.de/eigenwerte.html) blog post.
 
 **No neural networks.** No backpropagation. No gradient descent. Just matrix multiplication, a Gaussian kernel, and eigenvalues.
 
-## How it works
+## Architecture: Dual Model (RAG-style)
 
 ```
-User input → Word tokenization → Hash-based positional features
-→ Random Fourier Features (approximate Gaussian kernel)
-→ Solve (Z^TZ + λI) W = Z^TY
-→ Predict next word → Repeat
+User question → Keyword extraction → Retrieve best matching sentence (invisible)
+→ Use as seed context → KRR generation (word by word) → Color-coded output
 ```
 
-1. **Corpus** (~2500 word tokens) is split into 5-word context windows
-2. **Features**: Positional word hashes + bigram hashes (1024 dimensions)
-3. **Random Fourier Features** (D=2048) approximate the Gaussian kernel, reducing O(n³) to O(n·D²)
-4. **GPU acceleration**: RFF projection and Z^TZ computed on GPU via TensorFlow.js WebGL — works on any GPU (Intel, AMD, Apple, NVIDIA)
-5. **Linear solve**: 2048×2048 Gaussian elimination on CPU
-6. **Generation**: Top-K sampling with repetition penalty, stops at sentence boundaries
+### System 1 — Retrieval (805 sentences)
+Keyword search over a corpus of ArXiv ML abstracts + curated eigenvector content. Finds the most relevant sentence to use as generation context. **Not shown directly** — acts as invisible seed (like RAG).
+
+### System 2 — Generation (KRR language model)
+Trained offline (Float64, NumPy) on 104 curated sentences (505-word vocabulary, 1427 tokens). Predicts the next word given the last 5 words. The model weights are loaded as compressed Float16 in the browser.
+
+### Conversation Memory
+Follow-up questions ("and then?", "what about...?") inherit keywords from previous turns and continue generating from where the last answer ended — inspired by LangChain's ConversationBufferWindowMemory.
+
+## Color-coded output
+
+Every generated word is color-coded by source:
+
+| Color | Meaning |
+|-------|---------|
+| **Green** | KRR-generated, appears as 3/4-gram in training data (verbatim / memorization) |
+| **Orange** | KRR-generated, NOT in training data (novel / generalization) |
+
+Typically ~60-70% verbatim, ~30-40% novel. The coloring makes the boundary between memorization and generalization literally visible.
 
 ## The math behind it
 
-This is the chain from the blog post:
-
 ```
-Projection → Iterative Residual Correction → Eigenvalues → Regularization
-→ Kernel Trick (X^TX → K) → Random Fourier Features → Word Prediction
+Word hashing          → Feature map φ(x)
+Random Fourier Features → Kernel approximation k(x,x') ≈ z(x)ᵀz(x')
+Gaussian elimination   → Solve (ZᵀZ + λI)W = ZᵀY
+Ridge parameter λ      → Regularization = early stopping
+Hash collisions        → Condition number of the matrix
+Float64 vs Float32     → Numerical stability (why offline training matters)
 ```
 
 - **Kernel Ridge Regression** replaces neural networks
 - **Random Fourier Features** (Rahimi & Recht, 2007) break the O(n³) scaling barrier
-- **Early stopping ≈ Ridge Regression** (λ ≈ 1/n) — regularization without a penalty term
 - **Eigenvalues** of the kernel matrix determine what the model learns (signal) and ignores (noise)
+- **The Representer Theorem** guarantees: the training data IS the model
 
-The Representer Theorem guarantees: the optimal KRR solution is a weighted sum of kernel evaluations at the training points. **The training data IS the model.**
+## Why offline training?
+
+Training directly in the browser (Float32 WebGL) fails for larger vocabularies — Gaussian elimination needs ~15 significant digits, but Float32 only provides 7. Result: "learning learning learning learning..."
+
+Solution: Train offline with Float64 (NumPy), export weights as gzipped Float16. Full-precision training, reduced-precision inference — same principle as LLM quantization.
 
 ## Run locally
 
-Just open `index.html` in any modern browser. No build step, no dependencies beyond TensorFlow.js (loaded from CDN).
+Just open `index.html` in any modern browser. No build step, no server needed. The 5.8MB file contains everything: model weights, corpus, and UI.
 
 ```bash
 git clone https://github.com/pmmathias/krr-chat.git
 cd krr-chat
-open index.html    # or python3 -m http.server 8080
+open index.html
 ```
-
-Training takes 3-15 seconds depending on your GPU.
 
 ## Performance
 
 | Metric | Value |
 |--------|-------|
-| Corpus | ~2500 word tokens, ~500 unique words |
-| Context | 5 words |
-| Features | 1024 dimensions (hash-based) |
-| RFF | D=2048 random Fourier features |
-| Training | 3-15s (GPU via WebGL) |
-| Top-1 accuracy | ~35-45% (on held-out test set) |
-| Top-3 accuracy | ~55-65% |
-| Vocab | ~500 words (eigenvalues, ML, quantum mechanics) |
-
-For comparison: random baseline would be ~0.2% top-1 accuracy on 500 classes.
-
-## Why not a neural network?
-
-This project is a proof of concept for the thesis of [Eigen-KI](https://ki-mathias.de/eigenwerte.html): **Kernel Ridge Regression and neural networks are equally powerful in theory** (Representer Theorem + Universal Approximation Theorem). The difference is computational efficiency, not mathematical power.
-
-A Transformer with the same training data would be faster and more accurate — but it would hide the eigenvalue structure that makes everything work. This model makes it visible.
+| Retrieval corpus | 805 sentences (ArXiv + curated) |
+| Generation corpus | 104 sentences, 1427 tokens, 505 unique words |
+| Context window | 5 words |
+| Features | 1024 dimensions (HASH=128 × 5 pos + 3 bigram) |
+| RFF dimension | D=1536 |
+| Training | Offline (Float64, ~1 second) |
+| Top-1 accuracy | 99.8% on training data |
+| File size | ~5.8 MB (self-contained HTML) |
 
 ## Connection to the blog
 
-This is the interactive companion to the blog post [Eigenwerte & KI](https://ki-mathias.de/eigenwerte.html) ([English](https://ki-mathias.de/en/eigenvalues.html)) on [ki-mathias.de](https://ki-mathias.de).
+Interactive companion to [Eigenwerte & KI](https://ki-mathias.de/eigenwerte.html) ([English](https://ki-mathias.de/en/eigenvalues.html)) on [ki-mathias.de](https://ki-mathias.de). The blog post includes a detailed section explaining how the chatbot works.
 
 ## License
 
