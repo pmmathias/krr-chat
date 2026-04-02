@@ -1,6 +1,27 @@
-# KRR Chat
+<div align="center">
 
-**A mini language model built on Kernel Ridge Regression — no neural networks, just eigenvalues.**
+# λ KRR Chat
+
+### A language model with no neural network.
+### Just eigenvalues, kernel ridge regression, and 120 lines of JavaScript.
+
+[![Live Demo](https://img.shields.io/badge/🔴_Live_Demo-ki--mathias.de-22d3ee?style=for-the-badge)](https://ki-mathias.de/krr-chat.html)
+[![Blog Post](https://img.shields.io/badge/📖_Blog_Post-Under_the_Hood-f59e0b?style=for-the-badge)](https://ki-mathias.de/en/krr-chat-explained.html)
+
+![No Neural Network](https://img.shields.io/badge/neural_network-NONE-ff6b6b?style=flat-square)
+![Vanilla JS](https://img.shields.io/badge/vanilla_JS-120_lines-34d399?style=flat-square)
+![Browser](https://img.shields.io/badge/runs_in-browser-22d3ee?style=flat-square)
+![Float64](https://img.shields.io/badge/trained-Float64-f59e0b?style=flat-square)
+![MIT](https://img.shields.io/badge/license-MIT-gray?style=flat-square)
+
+<br>
+
+**The same task as GPT-4 — predict the next word — solved with eigenvalues instead of backpropagation.**
+
+<br>
+</div>
+
+---
 
 [**Try it live**](https://ki-mathias.de/krr-chat.html)
 
