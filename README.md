@@ -1,17 +1,18 @@
 <div align="center">
 
-# λ KRR Chat
+# λ KRR Chat + 👋 Kalle
 
-### A language model with no neural network.
-### Just eigenvalues, kernel ridge regression, and 120 lines of JavaScript.
+### Language models with no neural network.
+### Just eigenvalues, kernel ridge regression, and honest corpus engineering.
 
-[![Live Demo](https://img.shields.io/badge/🔴_Live_Demo-ki--mathias.de-22d3ee?style=for-the-badge)](https://ki-mathias.de/krr-chat.html)
-[![Blog Post](https://img.shields.io/badge/📖_Blog_Post-Under_the_Hood-f59e0b?style=for-the-badge)](https://ki-mathias.de/en/krr-chat-explained.html)
+[![KRR Chat](https://img.shields.io/badge/🔴_KRR_Chat-Eigenvalues_(EN)-22d3ee?style=for-the-badge)](https://ki-mathias.de/krr-chat.html)
+[![Kalle](https://img.shields.io/badge/👋_Kalle-Buddy_Chat_(DE)-34d399?style=for-the-badge)](https://ki-mathias.de/kalle-chat.html)
+[![Blog Post](https://img.shields.io/badge/📖_Deep_Dive-Under_the_Hood-f59e0b?style=for-the-badge)](https://ki-mathias.de/en/krr-chat-explained.html)
 
 ![No Neural Network](https://img.shields.io/badge/neural_network-NONE-ff6b6b?style=flat-square)
-![Vanilla JS](https://img.shields.io/badge/vanilla_JS-120_lines-34d399?style=flat-square)
-![Browser](https://img.shields.io/badge/runs_in-browser-22d3ee?style=flat-square)
-![Float64](https://img.shields.io/badge/trained-Float64-f59e0b?style=flat-square)
+![Vanilla JS](https://img.shields.io/badge/vanilla_JS-~80_lines_matching-34d399?style=flat-square)
+![Browser](https://img.shields.io/badge/runs_in-browser_(GPU)-22d3ee?style=flat-square)
+![Float64](https://img.shields.io/badge/trained-Float64_offline-f59e0b?style=flat-square)
 ![MIT](https://img.shields.io/badge/license-MIT-gray?style=flat-square)
 
 <br>
@@ -23,89 +24,104 @@
 
 ---
 
-[**Try it live**](https://ki-mathias.de/krr-chat.html)
+## Two chatbots, one principle
+
+| | λ KRR Chat (EN) | 👋 Kalle (DE) |
+|---|---|---|
+| **Language** | English (technical) | German (casual) |
+| **Corpus** | 104 sentences on eigenvalues & ML | **2113 curated dialogue pairs** |
+| **Vocabulary** | 505 words (hash encoding) | **1445 words (Word2Vec, 32-dim)** |
+| **Context** | 5 words | **24 words** |
+| **RFF dimension** | D=1536 | **D=6144** |
+| **Multi-turn** | Keyword memory | **lastBotTurn concatenation + `<that>`-pairs** |
+| **Scope handling** | — | **Honest fallback ("I can only talk about X")** |
+| **File size** | 5.8 MB | **33 MB** |
+
+[**Try KRR Chat (EN)**](https://ki-mathias.de/krr-chat.html) · [**Try Kalle (DE)**](https://ki-mathias.de/kalle-chat.html)
 
 ## What is this?
 
-A dual-model language chatbot that runs entirely in your browser. It answers questions about eigenvalues, kernel methods, quantum mechanics, and machine learning using Kernel Ridge Regression with Random Fourier Features — the same mathematical chain described in the [Eigenvalues & AI](https://ki-mathias.de/eigenwerte.html) blog post.
+Two chatbots that run entirely in your browser using **Kernel Ridge Regression** with **Random Fourier Features**. No neural networks, no backpropagation, no gradient descent — just matrix multiplication, a Gaussian kernel, and eigenvalues.
 
-**No neural networks.** No backpropagation. No gradient descent. Just matrix multiplication, a Gaussian kernel, and eigenvalues.
+**KRR Chat** answers questions about eigenvalues, kernel methods, and machine learning in English.
 
-## Architecture: Dual Model (RAG-style)
+**Kalle** is a German buddy chatbot that chats about food, hobbies, music, feelings, weather, and simple math — with multi-turn context awareness, emergent math validation, and honest scope boundaries.
+
+## Kalle's architecture (new)
 
 ```
-User question → Keyword extraction → Retrieve best matching sentence (invisible)
+User: "Fisch" (after Kalle talked about pizza)
+
+1. queryText = lastBotTurn + " " + userInput
+   → "mein lieblingsessen ist pizza ... fisch"
+
+2. BoW+IDF embedding (32-dim Word2Vec)
+   → semantic query vector
+
+3. Combined scoring: α × keyword + (1-α) × semantic
+   → best matching dialogue pair
+
+4. Response from matched pair (word-by-word animation)
+
+5. Prediction Comparison: KRR's top-3 prediction per word
+   → green (agreed) / yellow (would have differed)
+```
+
+**No stemming. No substring expansion. No keyword hacks.** Just full-text BoW+IDF matching against curated dialogue pairs. The IDF weighting naturally down-weights function words.
+
+## Emergent behavior
+
+Things **nobody programmed** that emerge from pure pattern matching:
+
+- **Math validation**: Kalle asks "what is 3+5?", user says "8" → "correct! 3+5=8" — no code checks the math, it's pure pair matching
+- **Insult immunity**: Profanity is out-of-vocabulary → invisible to the model → no filter needed
+- **Typo robustness**: OOV words from typos are silently ignored, remaining words still match
+- **Honest limits**: Low confidence → "I can only talk about food, hobbies, music, feelings, weather and math"
+
+## The journey: Less is more
+
+| Iteration | Pairs | Encoding | Top-1 | Lesson |
+|---|---|---|---|---|
+| V1 (original) | 57 | Hash (128 buckets) | 99.8% | Perfect but narrow |
+| MEGA (mass) | 4301 | Word2Vec + hacks | 34.9% | More data = worse! |
+| **FINAL (curated)** | **2113** | **Word2Vec (32-dim)** | **65.4%** | **Curated > generated** |
+
+This mirrors what OpenAI, Anthropic and Google learned: **data quality beats data quantity**. Instruction-tuning datasets are carefully curated — just like Kalle's corpus.
+
+## KRR Chat architecture (original)
+
+```
+User question → Keyword extraction → Retrieve best matching sentence
 → Use as seed context → KRR generation (word by word) → Color-coded output
 ```
 
-### System 1 — Retrieval (805 sentences)
-Keyword search over a corpus of ArXiv ML abstracts + curated eigenvector content. Finds the most relevant sentence to use as generation context. **Not shown directly** — acts as invisible seed (like RAG).
-
-### System 2 — Generation (KRR language model)
-Trained offline (Float64, NumPy) on 104 curated sentences (505-word vocabulary, 1427 tokens). Predicts the next word given the last 5 words. The model weights are loaded as compressed Float16 in the browser.
-
-### Conversation Memory
-Follow-up questions ("and then?", "what about...?") inherit keywords from previous turns and continue generating from where the last answer ended — inspired by LangChain's ConversationBufferWindowMemory.
-
-## Color-coded output
-
-Every generated word is color-coded by source:
-
-| Color | Meaning |
-|-------|---------|
-| **Green** | KRR-generated, appears as 3/4-gram in training data (verbatim / memorization) |
-| **Orange** | KRR-generated, NOT in training data (novel / generalization) |
-
-Typically ~60-70% verbatim, ~30-40% novel. The coloring makes the boundary between memorization and generalization literally visible.
+- **System 1 — Retrieval**: 805 sentences (ArXiv + curated eigenvector content)
+- **System 2 — Generation**: KRR language model trained on 104 sentences (Float64 offline)
 
 ## The math behind it
 
 ```
-Word hashing          → Feature map φ(x)
+Word2Vec embeddings    → Feature map φ(x) (replaces hash encoding)
 Random Fourier Features → Kernel approximation k(x,x') ≈ z(x)ᵀz(x')
 Gaussian elimination   → Solve (ZᵀZ + λI)W = ZᵀY
 Ridge parameter λ      → Regularization = early stopping
-Hash collisions        → Condition number of the matrix
-Float64 vs Float32     → Numerical stability (why offline training matters)
+Eigenvalues of ZᵀZ    → What the model learns (signal) vs ignores (noise)
 ```
 
-- **Kernel Ridge Regression** replaces neural networks
-- **Random Fourier Features** (Rahimi & Recht, 2007) break the O(n³) scaling barrier
-- **Eigenvalues** of the kernel matrix determine what the model learns (signal) and ignores (noise)
-- **The Representer Theorem** guarantees: the training data IS the model
-
-## Why offline training?
-
-Training directly in the browser (Float32 WebGL) fails for larger vocabularies — Gaussian elimination needs ~15 significant digits, but Float32 only provides 7. Result: "learning learning learning learning..."
-
-Solution: Train offline with Float64 (NumPy), export weights as gzipped Float16. Full-precision training, reduced-precision inference — same principle as LLM quantization.
-
 ## Run locally
-
-Just open `index.html` in any modern browser. No build step, no server needed. The 5.8MB file contains everything: model weights, corpus, and UI.
 
 ```bash
 git clone https://github.com/pmmathias/krr-chat.git
 cd krr-chat
-open index.html
+open index.html       # KRR Chat (EN)
+open kalle-chat.html  # Kalle (DE)
 ```
 
-## Performance
-
-| Metric | Value |
-|--------|-------|
-| Retrieval corpus | 805 sentences (ArXiv + curated) |
-| Generation corpus | 104 sentences, 1427 tokens, 505 unique words |
-| Context window | 5 words |
-| Features | 1024 dimensions (HASH=128 × 5 pos + 3 bigram) |
-| RFF dimension | D=1536 |
-| Training | Offline (Float64, ~1 second) |
-| Top-1 accuracy | 99.8% on training data |
-| File size | ~5.8 MB (self-contained HTML) |
+No build step, no server needed. Self-contained HTML files with embedded model weights.
 
 ## Connection to the blog
 
-Interactive companion to [Eigenwerte & KI](https://ki-mathias.de/eigenwerte.html) ([English](https://ki-mathias.de/en/eigenvalues.html)) on [ki-mathias.de](https://ki-mathias.de). The blog post includes a detailed section explaining how the chatbot works.
+Interactive companion to [Eigenwerte & KI](https://ki-mathias.de/eigenwerte.html) ([English](https://ki-mathias.de/en/eigenvalues.html)) on [ki-mathias.de](https://ki-mathias.de). The [Deep-Dive blog post](https://ki-mathias.de/krr-chat-erklaert.html) explains every component in detail.
 
 ## License
 
