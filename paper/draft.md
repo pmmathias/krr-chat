@@ -2,267 +2,344 @@
 
 **Mathias Leonhardt**
 KI-Mathias / pmagentur.com, Hamburg, Germany
-mathias@ki-mathias.de
+mathias-leonhardt@gmx.de
 
 ---
 
 ## Abstract
 
-We present Kalle, a fully client-side bilingual chatbot that performs next-word prediction and retrieval-augmented generation (RAG) using Kernel Ridge Regression (KRR) with Random Fourier Features — without neural networks, backpropagation, or gradient descent. The system makes the mathematical foundations of modern language models *transparent*: every component (feature maps, kernel approximation, regularization, eigenvalue spectra) is inspectable and maps to a concept from linear algebra. Kalle serves 2,178 curated Q&A pairs in German and English, runs entirely in the browser via WebGL GPU acceleration (TensorFlow.js), and achieves functional conversational ability including multi-turn context, bilingual routing without language detection, and RAG over blog content — all through corpus design rather than architectural complexity. We demonstrate that the mathematical structure underlying large language models can be made visible, interactive, and pedagogically useful at a scale of ~18M parameters and a single closed-form matrix solve. The system, source code, and training data are publicly available.
-
-**Keywords:** kernel ridge regression, random fourier features, language model, educational NLP, browser-based ML, retrieval-augmented generation
+We present Kalle, a fully client-side bilingual chatbot that performs next-word prediction and retrieval-augmented generation (RAG) using Kernel Ridge Regression (KRR) with Random Fourier Features — without neural networks, backpropagation, or gradient descent. The system makes the mathematical foundations of modern language models *transparent*: the same eigenvalue structure that governs convergence of the Neumann series, stability of PageRank, light transport in radiosity, and learning dynamics of neural networks is exposed in an interactive, inspectable system. Kalle serves 2,178 curated Q&A pairs bilingually, runs entirely in the browser via WebGL GPU (TensorFlow.js), and achieves functional conversational ability including multi-turn context and RAG — all through a single closed-form matrix solve. We derive the complete mathematical chain from projection to kernel methods and show that the Neural Tangent Kernel theorem (Jacot et al., 2018) makes this connection rigorous: in the infinite-width limit, a neural network *becomes* KRR.
 
 ---
 
 ## 1. Introduction
 
-Modern large language models (LLMs) are powerful but opaque. GPT-4, Claude, and Gemini predict the next token given context — but the mechanism (attention layers, backpropagation over billions of parameters, RLHF) is inaccessible to anyone without specialized ML infrastructure. This opacity is a pedagogical problem: students learn *that* LLMs work, not *why*.
+Modern large language models solve a deceptively simple task: given a sequence of words, predict the next one. The mechanism — transformer attention over billions of parameters, trained via backpropagation with RLHF — is powerful but opaque. A student can learn *that* GPT-4 works; understanding *why* requires infrastructure and expertise that most curricula cannot provide.
 
-We ask: **Can the core task of language modeling — predict the next word given context — be solved with transparent mathematics at a scale where every component remains inspectable?**
+We ask: **Can next-word prediction be solved with mathematics transparent enough that every component maps to a textbook concept — while remaining functional enough to demonstrate the principles at work?**
 
-We present Kalle, a system that answers this question affirmatively. Kalle is a bilingual (German/English) chatbot that combines:
-
-1. **Kernel Ridge Regression** (KRR) with a closed-form solution — no gradient descent, no epochs, no convergence monitoring
-2. **Random Fourier Features** (RFF; Rahimi & Recht, 2007) — approximating the Gaussian kernel without computing the full kernel matrix
-3. **Word2Vec embeddings** (Mikolov et al., 2013) — providing collision-free word representations
-4. **BoW+IDF matching** — retrieval over curated Q&A pairs using weighted bag-of-words with inverse document frequency
-5. **RAG** — retrieval-augmented generation over blog content, without an LLM
-
-The entire system runs in the browser (WebGL GPU via TensorFlow.js), requires no server, and is deployed as a single self-contained HTML file (~56 MB). Every prediction is accompanied by a **color-coded comparison** showing whether the KRR model agrees with the corpus (green) or would have chosen differently (yellow) — making the boundary between memorization and generalization *visible*.
-
-Kalle is not a competitor to production LLMs. It is a **didactic instrument** that makes the mathematical structure behind language models transparent — eigenvalues, kernel functions, regularization, feature maps — on a scale where a student can follow every step.
+We present Kalle, a system that answers affirmatively. The mathematical structure is not a simplification of neural language models — it is the *same* structure, made visible. The unifying thread is **eigenvalues**: they control convergence of iterative methods (§2), determine what a model learns versus ignores (§3), govern the stability of PageRank and radiosity (§4), and — through the Neural Tangent Kernel — connect KRR to neural networks rigorously (§5).
 
 ---
 
-## 2. System Architecture
+## 2. Mathematical Foundations
 
-### 2.1 Training Pipeline (Offline, Python, Float64)
+### 2.1 From Projection to the Normal Equation
 
-Training proceeds in five steps, all computed once in closed form:
+The simplest prediction problem: given data matrix $X$ and targets $\mathbf{y}$, find the coefficient vector $\mathbf{c}$ that minimizes $\|X\mathbf{c} - \mathbf{y}\|^2$. The solution is the orthogonal projection of $\mathbf{y}$ onto the column space of $X$:
 
-**Step 1: Corpus preparation.** The training corpus consists of 2,178 curated dialog pairs in the format `du: {user} . bot: {response} .` The full token sequence (5× repeated for training signal) contains 322,660 tokens over a vocabulary of 2,977 words.
+$$\hat{\mathbf{y}} = X(X^\top X)^{-1} X^\top \mathbf{y}$$
 
-**Step 2: Word2Vec embeddings.** We train 32-dimensional Word2Vec embeddings (Mikolov et al., 2013) on the corpus using CBOW with window size 8 and 20 epochs (gensim). Each word receives a unique vector; similar words (e.g., "pizza" / "pasta") have similar vectors. This eliminates hash collisions that plagued an earlier version using modular hashing.
+This requires solving the **normal equation**:
 
-**Step 3: Context encoding.** Each training sample encodes a context of CTX=24 consecutive words as a feature vector φ(x) ∈ ℝ^768 by concatenating position-weighted Word2Vec embeddings:
+$$X^\top X\,\mathbf{c} = X^\top \mathbf{y} \quad\Longrightarrow\quad \mathbf{c} = (X^\top X)^{-1} X^\top \mathbf{y} \tag{1}$$
 
-$$\phi(x) = [\alpha_1 \cdot e_{w_1}, \alpha_2 \cdot e_{w_2}, \ldots, \alpha_{24} \cdot e_{w_{24}}]$$
+### 2.2 Iterative Solution and the Neumann Series
 
-where $e_{w_i}$ is the 32-dim embedding of word $w_i$ and $\alpha_i = 0.4 + 0.6 \cdot i/23$ assigns linearly increasing weight to more recent context positions.
+Instead of inverting $X^\top X$ directly, we can iterate. Starting from $\hat{\mathbf{y}}_0 = \mathbf{0}$:
 
-**Step 4: Random Fourier Features.** Following Rahimi & Recht (2007), we approximate the Gaussian kernel $k(x,x') = \exp(-\|x-x'\|^2/2\sigma^2)$ with $\sigma=1.5$ using D=6,144 random features:
+$$\hat{\mathbf{y}}_{n+1} = \hat{\mathbf{y}}_n + X^\top(\mathbf{y} - X\hat{\mathbf{y}}_n)$$
 
-$$z(x) = \sqrt{2/D} \cdot \cos(\phi(x) \cdot \omega + b)$$
+The residual after $n$ steps satisfies:
 
-where $\omega \sim \mathcal{N}(0, 1/\sigma^2)^{768 \times 6144}$ and $b \sim \text{Uniform}(0, 2\pi)^{6144}$ are drawn once with a fixed random seed and never modified.
+$$\mathbf{r}_n = (I - X^\top X)^n \cdot \mathbf{y} \tag{2}$$
 
-**Step 5: KRR solve.** We solve the ridge regression system in closed form:
+This converges when all eigenvalues of $(I - X^\top X)$ have magnitude less than 1. The limit is the **Neumann series** — the matrix generalization of the geometric series $\sum q^k = 1/(1-q)$:
 
-$$W = (Z^\top Z + \lambda I)^{-1} Z^\top Y$$
+$$\sum_{k=0}^{\infty} A^k = (I - A)^{-1} \quad\text{when } \rho(A) < 1 \tag{3}$$
 
-where $Z$ is the RFF matrix (computed in streaming chunks of 10,000 to avoid OOM), $Y$ is the one-hot target matrix, and $\lambda = 10^{-6}$. $W \in \mathbb{R}^{6144 \times 2977}$ (~18.1M parameters) is the only learned parameter. Total solve time: ~2 seconds on a single CPU core.
+where $\rho(A)$ denotes the spectral radius. The iteration converges exactly to the closed-form solution (1). This is not coincidence — it is the same equation approached from two directions.
 
-### 2.2 Inference Pipeline (Online, Browser, WebGL GPU)
+### 2.3 Eigenvalues Control Everything
 
-At inference time, only three operations execute per word:
+Let $\mu_1, \ldots, \mu_n$ be the eigenvalues of $X^\top X$ with corresponding eigenvectors $\mathbf{v}_1, \ldots, \mathbf{v}_n$. The spectral decomposition gives:
+
+$$A^n = V \Lambda^n V^{-1} \tag{4}$$
+
+The component of the solution along the $i$-th eigenvector is retained after $n$ iterations by the factor:
+
+$$f_i^{(\text{iter})}(n) = 1 - (1 - \mu_i)^n \tag{5}$$
+
+This has profound consequences:
+- **Large $\mu_i$** (strong signal): $f_i \to 1$ quickly — learned in few iterations
+- **Small $\mu_i$** (weak signal/noise): $f_i \approx n\mu_i$ — learned slowly
+- **Early stopping at step $n$**: components with $\mu_i \ll 1/n$ are suppressed
+
+Early stopping is not a heuristic — it is a *spectral filter* on the eigenvalue decomposition.
+
+### 2.4 Ridge Regression: The Closed-Form Spectral Filter
+
+Instead of stopping early, we can add an explicit penalty. Ridge regression solves:
+
+$$\mathbf{c}_\lambda = (X^\top X + \lambda I)^{-1} X^\top \mathbf{y} \tag{6}$$
+
+The filter factor for the $i$-th eigencomponent becomes:
+
+$$f_i^{(\text{ridge})}(\lambda) = \frac{\mu_i}{\mu_i + \lambda} \tag{7}$$
+
+**Theorem (Early Stopping ≈ Ridge Regression).** The iterative filter (5) and the ridge filter (7) produce equivalent spectral filtering with the correspondence $\lambda \approx 1/n$. More iterations = less regularization. Fewer iterations = stronger smoothing. Both separate signal (large $\mu_i$) from noise (small $\mu_i$) using the eigenvalue spectrum.
+
+| Eigenvalue $\mu_i$ | Ridge factor $\frac{\mu_i}{\mu_i + \lambda}$ | Iter. factor $1-(1-\mu_i)^n$ | Interpretation |
+|---|---|---|---|
+| 1.0 | 0.999 | 1.000 | Signal: passes through |
+| 0.1 | 0.909 | 0.651 | Moderate: partially filtered |
+| 0.01 | 0.500 | 0.096 | Noise: heavily suppressed |
+| 0.001 | 0.091 | 0.010 | Noise: nearly eliminated |
+
+*(Table computed with $\lambda = 0.01$, $n = 10$.)*
+
+### 2.5 The Kernel Trick: From Finite to Infinite Dimensions
+
+Real-world data is rarely linear. The kernel trick lifts data into a higher-dimensional feature space $\phi: \mathbb{R}^d \to \mathcal{H}$ where nonlinear patterns become linear, without ever computing $\phi$ explicitly. A **kernel function** computes the inner product directly:
+
+$$k(x_i, x_j) = \langle \phi(x_i), \phi(x_j) \rangle \tag{8}$$
+
+The **Gaussian (RBF) kernel**
+
+$$k(x, z) = \exp\!\left(-\frac{\|x - z\|^2}{2\sigma^2}\right) \tag{9}$$
+
+has an *infinite-dimensional* feature space, yet the kernel matrix $K \in \mathbb{R}^{n \times n}$ remains finite. The iterative update generalizes to:
+
+$$\hat{\mathbf{y}}_{n+1} = \hat{\mathbf{y}}_n + K(\mathbf{y} - \hat{\mathbf{y}}_n) \tag{10}$$
+
+Replace $X^\top X$ with $K$. Same algorithm, same convergence analysis, same eigenvalue structure — but now with infinite expressive power.
+
+**Kernel Ridge Regression** combines (6) and (8):
+
+$$\boldsymbol{\alpha} = (K + \lambda I)^{-1} \mathbf{y} \tag{11}$$
+
+Prediction for a new point uses the **Representer Theorem** (Kimeldorf & Wahba, 1970): the optimal solution has the form
+
+$$f(x_*) = \sum_{i=1}^{n} \alpha_i\, k(x_i, x_*) \tag{12}$$
+
+The training data *is* the model. Each training point "votes" for the prediction, weighted by kernel similarity.
+
+### 2.6 Random Fourier Features: Making Kernels Scalable
+
+The kernel matrix $K$ is $n \times n$. For $n = 322{,}636$ training samples, this is infeasible. Rahimi & Recht (2007) showed that shift-invariant kernels can be approximated via random projection, using **Bochner's theorem**: a bounded continuous shift-invariant kernel is the Fourier transform of a non-negative measure.
+
+For the Gaussian kernel, this yields:
+
+$$z(x) = \sqrt{\frac{2}{D}} \cos(\omega^\top x + b) \tag{13}$$
+
+where $\omega \sim \mathcal{N}(0, \sigma^{-2} I)$ and $b \sim \text{Uniform}(0, 2\pi)$. The key property:
+
+$$z(x)^\top z(x') \approx k(x, x') \tag{14}$$
+
+The approximation improves with $D$. With RFF, the kernel ridge regression solution (11) becomes a standard linear system in the feature space:
+
+$$W = (Z^\top Z + \lambda I)^{-1} Z^\top Y \tag{15}$$
+
+where $Z \in \mathbb{R}^{N \times D}$ is the RFF feature matrix. This is Equation (6) again — the normal equation with ridge regularization — but operating on random Fourier features instead of raw data. The eigenvalues of $Z^\top Z$ control convergence, regularization, and what the model learns. **The same equation, the same eigenvalue structure, at every level of the hierarchy.**
+
+---
+
+## 3. The Unified Chain: One Equation, Four Applications
+
+The equation $(I - A)^{-1}\mathbf{b} = \sum_{k=0}^{\infty} A^k \mathbf{b}$ appears in four seemingly unrelated domains. In each case, convergence is governed by the eigenvalues of $A$.
+
+### 3.1 Radiosity: Light Bouncing Between Walls
+
+The radiosity equation describes global illumination in computer graphics:
+
+$$\mathbf{B} = \mathbf{E} + \rho F \mathbf{B} \quad\Longrightarrow\quad \mathbf{B} = (I - \rho F)^{-1} \mathbf{E} = \sum_{k=0}^{\infty} (\rho F)^k \mathbf{E} \tag{16}$$
+
+where $\mathbf{E}$ is direct emission, $\rho$ is reflectivity, and $F$ is the form factor matrix. Each term $(\rho F)^k \mathbf{E}$ represents one additional light bounce. The matrix $\rho F$ is **substochastic** (column sums $< 1$) because surfaces absorb energy. Convergence is guaranteed when $\rho({\rho F}) < 1$.
+
+To make $\rho F$ stochastic (column sums $= 1$), we add an **absorber dimension** — a virtual surface that captures all unabsorbed light. The resulting stochastic matrix describes a Markov chain whose stationary distribution is the dominant eigenvector with eigenvalue 1.
+
+### 3.2 PageRank: Importance Spreading Through Links
+
+Google's PageRank (Page et al., 1998) applies the same structure to the web. The **Google matrix** is:
+
+$$G = d \cdot M + \frac{1-d}{n}\,\mathbf{1}\mathbf{1}^\top \tag{17}$$
+
+where $M$ is the column-stochastic link matrix, $d \approx 0.85$ is the damping factor (analogous to reflectivity $\rho$ in radiosity), and $(1-d)/n$ is the teleportation probability (analogous to the absorber).
+
+The PageRank vector is the dominant eigenvector of $G$:
+
+$$\mathbf{r}^{(k+1)} = G\,\mathbf{r}^{(k)} \xrightarrow{k \to \infty} \mathbf{r}^* \quad\text{with } G\mathbf{r}^* = \mathbf{r}^* \tag{18}$$
+
+The damping factor ensures $G$ is stochastic and primitive, guaranteeing a unique dominant eigenvector (Perron-Frobenius theorem). The **spectral gap** $1 - |\lambda_2|$ determines convergence speed — larger gap means faster convergence. With $d = 0.85$, $|\lambda_2| \le 0.85$, giving reliable convergence in $\sim$50–100 iterations even for billions of pages.
+
+### 3.3 KRR Language Model: Predictions Spreading Through Similarities
+
+Our language model has the same structure. The kernel matrix $K$ measures pairwise context similarities. The regularized prediction:
+
+$$\boldsymbol{\alpha} = (K + \lambda I)^{-1} \mathbf{y}$$
+
+can be rewritten as a Neumann series when $\rho(K) < 1 + \lambda$:
+
+$$\boldsymbol{\alpha} = \frac{1}{\lambda}\sum_{k=0}^{\infty} \left(-\frac{K}{\lambda}\right)^k \mathbf{y}$$
+
+Each term represents one "bounce" of prediction influence through the kernel similarity graph — analogous to light bouncing between walls (radiosity) or importance spreading through links (PageRank).
+
+### 3.4 Summary: Same Equation, Same Eigenvalues
+
+| Domain | Matrix $A$ | "Source" $\mathbf{b}$ | Eigenvalue role |
+|--------|-----------|----------------------|-----------------|
+| Regression | $X^\top X$ | $X^\top \mathbf{y}$ | Convergence speed |
+| Radiosity | $\rho F$ | $\mathbf{E}$ (emission) | Light distribution |
+| PageRank | $G$ | uniform start | Webpage ranking |
+| KRR | $K/\lambda$ | $\mathbf{y}/\lambda$ | What model learns |
+
+All four solve $(I - A)\mathbf{x} = \mathbf{b}$ via the Neumann series. All four converge when $\rho(A) < 1$. All four are controlled by eigenvalues.
+
+---
+
+## 4. The Neural Network Connection
+
+### 4.1 Universal Approximation
+
+Three results establish the power of our approach:
+
+1. **Representer Theorem** (Kimeldorf & Wahba, 1970): The optimal KRR solution has the form $f^*(x) = \sum_i \alpha_i k(x_i, x)$ — finitely many coefficients regardless of the kernel space dimension.
+
+2. **Universal Approximation** (Cybenko, 1989): A neural network with one hidden layer can approximate any continuous function to arbitrary precision.
+
+3. **Gaussian Kernel Universality** (Micchelli et al., 2006): KRR with the Gaussian kernel can approximate any continuous function on a compact set.
+
+Both KRR and neural networks are **dense in $C(K)$** — the space of continuous functions on a compact set. They are equally powerful in principle.
+
+### 4.2 Neural Tangent Kernel: From Metaphor to Theorem
+
+The connection is not merely analogical. Jacot et al. (2018) proved that in the limit of infinite width with suitable initialization, a neural network **becomes** kernel ridge regression. The **Neural Tangent Kernel** (NTK) is:
+
+$$\Theta(x, x') = \left\langle \frac{\partial f(x; \theta)}{\partial \theta}, \frac{\partial f(x'; \theta)}{\partial \theta} \right\rangle$$
+
+In the infinite-width limit, $\Theta$ converges to a deterministic kernel, and gradient descent on the neural network converges to the KRR solution with this kernel. The eigenvalues of $\Theta$ determine what the network learns first (large eigenvalues) and what it learns last or ignores (small eigenvalues).
+
+This is not a metaphor. Kalle's KRR system and a neural language model are governed by the **same eigenvalue structure** — Kalle simply makes it visible.
+
+---
+
+## 5. System Implementation
+
+### 5.1 Training Pipeline
+
+| Step | Operation | Output |
+|------|-----------|--------|
+| 1 | Parse corpus (2,178 pairs) | Token sequence (64,532 tokens) |
+| 2 | Word2Vec (gensim, 32-dim, CBOW) | Embedding matrix $E \in \mathbb{R}^{2977 \times 32}$ |
+| 3 | Context encoding: $\phi(x) = [\alpha_1 e_{w_1}, \ldots, \alpha_{24} e_{w_{24}}]$ | Feature vectors $\in \mathbb{R}^{768}$ |
+| 4 | RFF: $z(x) = \sqrt{2/D}\cos(\phi(x)\omega + b)$, $D=6144$ | $Z \in \mathbb{R}^{N \times 6144}$ (streaming) |
+| 5 | KRR: $W = (Z^\top Z + \lambda I)^{-1} Z^\top Y$ | $W \in \mathbb{R}^{6144 \times 2977}$ (18.1M params) |
+| 6 | IDF + BoW pair embeddings (32-dim) | Sentence vectors for retrieval |
+| 7 | Float16 + gzip + base64 → inject into HTML | Self-contained ~56 MB file |
+
+Total training time: ~3 minutes on a single CPU core. Solve time for step 5: ~2 seconds.
+
+### 5.2 Inference
+
+Prediction requires one matrix-vector multiplication per word:
 
 $$\hat{w} = \text{argmax}(z(\text{context})^\top \cdot W)$$
 
-This is a single matrix-vector multiplication, running in <1ms on WebGL GPU.
+Running in <1ms per word on WebGL GPU via TensorFlow.js.
 
-### 2.3 Answer Retrieval (BoW+IDF Matching)
+### 5.3 Answer Retrieval and RAG
 
-Kalle does not generate free-form text from the KRR model. Instead, it **retrieves** the best-matching Q&A pair from the curated corpus using a combined scoring function:
+Kalle retrieves answers from curated Q&A pairs using combined scoring:
 
-$$\text{score} = 0.65 \cdot \text{kw}(q, p) + 0.35 \cdot \text{sem}(q, p)$$
+$$\text{score}(q, p) = 0.65 \cdot \text{kw}(q, p) + 0.35 \cdot \text{sem}(q, p) \tag{19}$$
 
-where $\text{kw}(q, p)$ is the IDF-weighted keyword overlap between query $q$ and pair user-side $p$, and $\text{sem}(q, p)$ is the cosine similarity between their 32-dimensional BoW+IDF sentence embeddings.
+where $\text{kw}$ is IDF-weighted keyword overlap and $\text{sem}$ is cosine similarity of 32-dim BoW+IDF embeddings. For domain questions, a RAG pipeline injects blog context: the query is augmented to `kontext {chunk} frage {query}` and matched against context-conditioned pairs.
 
-The KRR model then provides a **word-by-word prediction comparison**: for each word in the retrieved answer, the KRR model predicts its top-3 candidates. If the corpus word appears in the KRR top-3, it is rendered green (model agrees — verbatim knowledge); otherwise yellow (model would have chosen differently — the corpus answer diverges from what the model would generate).
+### 5.4 Prediction Comparison: Making Memorization Visible
 
-### 2.4 Retrieval-Augmented Generation (RAG)
+For each retrieved answer word, the KRR model predicts its top-3 candidates via Eq. (15). Words where the corpus agrees with KRR's top-3 are rendered **green** (the model has learned this pattern); disagreements are rendered **yellow** (the corpus answer diverges from what the kernel-space interpolation would produce). This makes the boundary between memorization and generalization *visible* — something production LLMs cannot offer.
 
-For domain-specific questions about blog content, Kalle implements a lightweight RAG pipeline:
+### 5.5 Multi-Turn Context
 
-1. **Chunk retrieval:** The blog is pre-segmented into 29 chunks (~58 words each). User query keywords are matched against chunk keywords (including English translations).
-2. **Prompt construction:** The best chunk is injected as context: `kontext {chunk_text} frage {user_query}`.
-3. **Pair matching:** The augmented prompt is matched against Q&A pairs that were trained on this format, using the same BoW+IDF scoring.
-
-This achieves RAG functionality without any LLM — the "generation" is retrieval over context-conditioned pairs.
-
-### 2.5 Multi-Turn Context
-
-Following AIML's `<that>` mechanism (Wallace, 2009), Kalle concatenates the full previous bot response (`lastBotTurn`) with the current user input before matching. This provides multi-turn context without explicit state tracking:
-
-```
-Kalle: "my favorite food is pizza. what about you?"
-User:  "Fish"
-Query: "my favorite food is pizza ... fish"
-Match: pair "favorite food pizza fish" → contextual response
-```
-
-The corpus includes explicit follow-up pairs whose user-sides contain context keywords from expected preceding turns.
+Following AIML's `<that>` mechanism (Wallace, 2009), the full previous bot response is concatenated with the current input before matching. The corpus includes follow-up pairs whose user-sides contain context keywords from expected preceding turns, enabling coherent multi-turn conversation through corpus design rather than architectural state.
 
 ---
 
-## 3. Design Decisions and Lessons Learned
+## 6. Evaluation
 
-### 3.1 Data Quality > Data Quantity
+### 6.1 Data Quality vs. Quantity
 
-The most instructive finding was the relationship between corpus size and quality:
-
-| Iteration | Pairs | Encoding | Top-1 Accuracy |
-|-----------|-------|----------|---------------|
-| V1 | 57 | Hash (128 buckets) | 99.8% |
-| V2 (mass expansion) | 4,301 | Word2Vec + heuristics | 34.9% |
+| Iteration | Pairs | Encoding | Top-1 |
+|-----------|-------|----------|-------|
+| V1 (original) | 57 | Hash (128 buckets) | 99.8% |
+| V2 (mass) | 4,301 | Word2Vec + heuristics | 34.9% |
 | V3 (curated) | 2,178 | Word2Vec (32-dim) | 63.5% |
 
-Blind corpus expansion *destroyed* quality because similar patterns competed in the feature space. This mirrors findings in instruction tuning for large models (Wei et al., 2022; Köpf et al., 2023), where curated datasets consistently outperform larger but noisier ones.
+The curve 99.8% → 34.9% → 63.5% demonstrates that blind corpus expansion destroys quality in KRR: similar patterns compete in the feature space, averaging out to noise. This mirrors findings in LLM instruction tuning (Wei et al., 2022; Köpf et al., 2023).
 
-### 3.2 Hash Encoding → Word2Vec
+### 6.2 Multi-Turn RAG Evaluation
 
-The original system used `hash(word) % 128`, mapping 505 words onto 128 buckets (~4 collisions/bucket). Replacing this with 32-dimensional Word2Vec embeddings eliminated all collisions and reduced the feature dimension from 3,072 to 768 while providing semantic similarity between related words.
+| Turn | Query | Chunk retrieved | kwRaw | Language |
+|------|-------|----------------|-------|----------|
+| 1 | "What are eigenvalues?" | Das Glasperlenspiel | 36.9 | EN→EN ✓ |
+| 2 | "und was hat das mit pagerank zu tun?" | Der Surfer | 44.3 | DE→EN ✓ |
+| 3 | "und mit radiosity? auf deutsch bitte" | Licht, das von Wänden springt | 42.0 | DE→DE ✓ |
+| 4 | "wie hängt das mit KRR zusammen?" | Was bedeutet das konkret? | 8.5 | DE→DE △ |
 
-### 3.3 Hyperparameter Choices
+3/4 turns retrieve the correct chunk; the 4th (abstract meta-question) shows a known limitation of keyword-based retrieval.
 
-- **σ = 1.5** (kernel bandwidth): Controls the trade-off between memorization (small σ, only very similar contexts match) and generalization (large σ, distant contexts influence each other). Chosen empirically to maximize Top-1 accuracy on the training set.
-- **λ = 10⁻⁶** (regularization): Deliberately small — the training set is dense enough that stronger regularization hurts prediction quality.
-- **D = 6,144** (RFF dimension): 8× oversampling of the 768-dimensional feature space, providing sufficient kernel approximation quality.
+### 6.3 Regression Test Suite
 
-### 3.4 Architectural Properties (Not "Emergent")
-
-Several properties arise deterministically from the BoW+IDF design:
-
-- **Bilingual routing:** English and German words are distinct tokens with distinct IDF weights. "eigenvalue" (high IDF) matches English pairs; "Eigenwert" (high IDF) matches German pairs. No language detection code needed.
-- **Typo robustness:** Out-of-vocabulary words (including typos) are silently ignored. Remaining in-vocabulary words suffice for matching.
-- **Insult immunity:** Profanity not in the vocabulary is invisible to the model.
-- **Math validation (illusory):** The pair `plus 3 5 8` matches when the user says "8" after a "3+5" question — pure pattern matching, not arithmetic.
+34 Playwright scenarios across greeting, food, emotion, math, meta, multi-turn, and edge cases. The system is tested automatically on every build.
 
 ---
 
-## 4. Evaluation
+## 7. Related Work
 
-### 4.1 Automated Regression Testing
+**Kernel methods for NLP.** String kernels (Lodhi et al., 2002) and spectrum kernels (Leslie et al., 2002) have been used for text classification. Our work applies KRR to autoregressive next-word prediction.
 
-We developed a Playwright-based test suite with 34 scenarios across 6 categories:
+**Random Fourier Features.** Rahimi & Recht (2007) — NeurIPS Test of Time Award 2017 — introduced RFF for scalable kernel approximation via Bochner's theorem. We apply RFF to language modeling.
 
-| Category | Scenarios | Description |
-|----------|-----------|-------------|
-| Greeting | 3 | Opening/closing phrases |
-| Food | 3 | Topic-specific responses |
-| Emotion | 3 | Empathetic responses |
-| Math | 4 | Arithmetic validation |
-| Meta | 3 | Self-description, scope |
-| Multi-turn | 14 | Context preservation across turns |
-| Edge cases | 4 | Typos, insults, long input |
+**Neural Tangent Kernel.** Jacot et al. (2018) proved that infinitely wide neural networks converge to kernel regression, establishing the theoretical bridge our system makes pedagogically visible.
 
-### 4.2 RAG Evaluation
+**Browser-based ML.** Ma et al. (2019) evaluated TensorFlow.js for in-browser deep learning. Kalle demonstrates that non-neural ML also runs effectively in the browser, with the advantage of full mathematical transparency.
 
-We tested the RAG pipeline with a 4-turn multi-topic conversation:
-
-| Turn | Query | Language | Retrieved Chunk | kwRaw | Result |
-|------|-------|----------|----------------|-------|--------|
-| 1 | "What are eigenvalues?" | EN | Das Glasperlenspiel | 36.9 | ✓ Correct, English |
-| 2 | "und was hat das mit pagerank zu tun?" | DE | Der Surfer | 44.3 | ✓ Correct, cross-topic |
-| 3 | "und mit radiosity? auf deutsch bitte" | DE | Licht, das von Wänden springt | 42.0 | ✓ Correct, language switch |
-| 4 | "wie hängt das mit KRR zusammen?" | DE | Was bedeutet das konkret? | 8.5 | △ Acceptable but weak |
-
-The system correctly retrieved relevant chunks in 3/4 cases and maintained conversational context across language switches and topic transitions. The 4th turn shows a known limitation: abstract meta-questions dilute the keyword signal.
-
-### 4.3 Prediction Comparison Statistics
-
-Across the test conversations, the KRR model's Top-3 prediction matched the corpus word 39–50% of the time (average ~44%). This means the model has learned enough structure to agree with roughly half of all words — while transparently showing where it would diverge.
+**RAG.** Lewis et al. (2020) introduced RAG with neural retrievers and generators. Kalle implements the RAG pattern using keyword matching and curated pairs — demonstrating that retrieval-augmented answering is separable from neural architecture.
 
 ---
 
-## 5. Related Work
+## 8. Limitations
 
-**Kernel methods for NLP.** String kernels (Lodhi et al., 2002) and spectrum kernels (Leslie et al., 2002) have been used for text classification, but not for autoregressive language modeling. Our work applies KRR to next-word prediction, a task typically reserved for neural models.
-
-**Random Fourier Features.** Rahimi & Recht (2007) introduced RFF for scalable kernel approximation, receiving the NeurIPS Test of Time Award in 2017. We apply RFF to language modeling, demonstrating that the kernel approximation is sufficient for a functional chatbot at moderate scale.
-
-**Educational NLP systems.** The Teaching NLP workshop series (Jurgens et al., 2024) has highlighted the need for interactive tools that make NLP concepts tangible. Kalle contributes by providing a complete, inspectable language model where every component maps to a mathematical concept.
-
-**Browser-based ML.** Ma et al. (2019) evaluated TensorFlow.js for deep learning in the browser. Kalle demonstrates that non-neural ML can also run effectively in the browser, with the advantage of mathematical transparency.
-
-**Retrieval-augmented generation.** Lewis et al. (2020) introduced RAG for knowledge-grounded generation with neural retrievers and generators. Kalle implements a RAG-like pipeline using keyword matching and curated Q&A pairs — demonstrating that the *pattern* of RAG (retrieve context, condition generation) is separable from neural architecture.
-
-**AIML and pattern-based chatbots.** Wallace (2009) described AIML's pattern matching with `<that>` tags for context. Kalle's `lastBotTurn` concatenation is a continuous-space analog of this mechanism.
+**No free-form generation.** Kalle retrieves pre-written answers; novel sentences are not composed. **Vocabulary-bound.** The 2,977-word vocabulary excludes most proper nouns and rare terms. **Scaling ceiling.** The KRR solve requires $O(D^2)$ memory ($\sim$288 MB at $D=6144$) and $O(D^3)$ compute; significantly larger models would need iterative solvers. **Evaluation scope.** Our evaluation is qualitative and scenario-based; formal metrics (perplexity, BLEU) are deferred to future work.
 
 ---
 
-## 6. Limitations
+## 9. Conclusion
 
-- **No free-form generation.** Kalle retrieves pre-written answers; it cannot compose novel sentences.
-- **Vocabulary-bound.** Words not in the 2,977-word vocabulary are invisible. This includes many proper nouns and technical terms.
-- **Scaling ceiling.** KRR's closed-form solution requires O(D²) memory and O(D³) compute for the solve. At D=6,144, this is ~288 MB and ~2 seconds. Scaling to D=100,000 (needed for significantly larger vocabularies) would require iterative methods, losing the closed-form advantage.
-- **File size.** The self-contained HTML file is ~56 MB, at the edge of practical web deployment.
-- **Evaluation scope.** Our evaluation is primarily qualitative and scenario-based. Formal metrics (perplexity, BLEU, human preference) are left for future work.
-
----
-
-## 7. Conclusion
-
-Kalle demonstrates that the mathematical foundations of language models — kernel functions, eigenvalues, regularization, feature maps — can be made transparent, interactive, and pedagogically useful. The system achieves functional conversational ability, bilingual routing, multi-turn context, and retrieval-augmented generation using three equations (RFF, KRR solve, matrix-vector prediction) and a curated corpus of 2,178 pairs.
-
-The key finding is not that KRR competes with neural language models — it does not. The key finding is that the *mathematical structure* is the same: feature maps, regularization, eigenvalue spectra controlling what is learned versus ignored. Making this structure visible is the contribution.
+Kalle demonstrates that the mathematical structure underlying language models — eigenvalues, kernel functions, the Neumann series, regularization as spectral filtering — can be made transparent, interactive, and pedagogically useful. The same equation $(I - A)^{-1}\mathbf{b}$ that governs light transport (radiosity), web ranking (PageRank), and prediction (KRR) is made visible in a system where every component is inspectable. The Neural Tangent Kernel theorem establishes that this is not a simplification of neural language models — it is the same mathematics, made visible at a scale where a student can follow every step.
 
 **Demo:** https://pmmathias.github.io/krr-chat/
-**Source:** https://github.com/pmmathias/krr-chat
+**Code:** https://github.com/pmmathias/krr-chat
 **Blog:** https://ki-mathias.de/en/krr-chat-explained.html
 
 ---
 
 ## References
 
-Lewis, P., Perez, E., Piktus, A., Petroni, F., Karpukhin, V., Goyal, N., ... & Kiela, D. (2020). Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks. *NeurIPS*.
+Cybenko, G. (1989). Approximation by Superpositions of a Sigmoidal Function. *Mathematics of Control, Signals and Systems*, 2(4), 303–314.
 
-Lodhi, H., Saunders, C., Shawe-Taylor, J., Cristianini, N., & Watkins, C. (2002). Text Classification using String Kernels. *JMLR*, 3, 419–444.
+Jacot, A., Gabriel, F., & Hongler, C. (2018). Neural Tangent Kernel: Convergence and Generalization in Neural Networks. *NeurIPS*.
 
-Jurgens, D., et al. (2024). Proceedings of the Sixth Workshop on Teaching NLP. *ACL 2024*.
+Kimeldorf, G. & Wahba, G. (1970). A Correspondence Between Bayesian Estimation on Stochastic Processes and Smoothing by Splines. *Annals of Mathematical Statistics*, 41(2), 495–502.
 
 Köpf, A., Kilcher, Y., von Rütte, D., et al. (2023). OpenAssistant Conversations — Democratizing Large Language Model Alignment. *NeurIPS Datasets and Benchmarks*.
 
 Leslie, C., Eskin, E., & Noble, W. S. (2002). The Spectrum Kernel: A String Kernel for SVM Protein Classification. *PSB*.
 
+Lewis, P., Perez, E., Piktus, A., et al. (2020). Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks. *NeurIPS*.
+
+Lodhi, H., Saunders, C., Shawe-Taylor, J., Cristianini, N., & Watkins, C. (2002). Text Classification using String Kernels. *JMLR*, 3, 419–444.
+
 Ma, Y., Xiang, D., Zheng, S., Tian, D., & Liu, Z. (2019). Moving Deep Learning into Web Browser: How Far Can We Go? *WWW*.
 
+Micchelli, C. A., Xu, Y., & Zhang, H. (2006). Universal Kernels. *JMLR*, 7, 2651–2667.
+
 Mikolov, T., Chen, K., Corrado, G., & Dean, J. (2013). Efficient Estimation of Word Representations in Vector Space. *ICLR Workshop*.
+
+Page, L., Brin, S., Motwani, R., & Winograd, T. (1998). The PageRank Citation Ranking: Bringing Order to the Web. *Stanford Technical Report*.
 
 Rahimi, A. & Recht, B. (2007). Random Features for Large-Scale Kernel Machines. *NeurIPS*.
 
 Wallace, R. (2009). The Anatomy of A.L.I.C.E. In *Parsing the Turing Test*, Springer.
 
 Wei, J., et al. (2022). Finetuned Language Models Are Zero-Shot Learners. *ICLR*.
-
----
-
-## Appendix A: Hyperparameters
-
-| Parameter | Value | Rationale |
-|-----------|-------|-----------|
-| CTX | 24 | Long enough for multi-turn context |
-| EMB_DIM | 32 | Word2Vec dimension |
-| FEAT | 768 (24 × 32) | Concatenated context embeddings |
-| D | 6,144 | RFF dimension (8× oversampling) |
-| σ | 1.5 | Kernel bandwidth (empirical) |
-| λ | 10⁻⁶ | Regularization (small, dense training set) |
-| REPEAT | 5 | Corpus repetition for training signal |
-| α | 0.65 | Keyword weight in combined scoring |
-
-## Appendix B: Corpus Statistics
-
-| Metric | Value |
-|--------|-------|
-| Total pairs | 2,178 |
-| German pairs | ~1,086 |
-| English pairs | ~1,092 |
-| RAG context pairs | 55 |
-| Vocabulary | 2,977 words |
-| Avg. response length | 20.2 words |
-| RAG chunks | 29 |
-| Avg. chunk length | 58 words |
-| Training tokens (5× repeat) | 322,660 |
-| Training samples (N) | 322,636 |
-| Model parameters (W) | 18.1M |
-| File size (deployed) | 56 MB |
