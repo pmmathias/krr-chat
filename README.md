@@ -1,17 +1,17 @@
 <div align="center">
 
-# λ KRR Chat + 👋 Kalle
+# λ Kalle — KRR Chat
 
-### Language models with no neural network.
-### Just eigenvalues, kernel ridge regression, and honest corpus engineering.
+### A language model with no neural network.
+### Eigenvalues, kernel ridge regression, and honest corpus engineering.
 
-[![KRR Chat](https://img.shields.io/badge/🔴_KRR_Chat-Eigenvalues_(EN)-22d3ee?style=for-the-badge)](https://ki-mathias.de/krr-chat.html)
-[![Kalle](https://img.shields.io/badge/👋_Kalle-Buddy_Chat_(DE)-34d399?style=for-the-badge)](https://ki-mathias.de/kalle-chat.html)
-[![Blog Post](https://img.shields.io/badge/📖_Deep_Dive-Under_the_Hood-f59e0b?style=for-the-badge)](https://ki-mathias.de/en/krr-chat-explained.html)
+[![Try Kalle](https://img.shields.io/badge/🚀_Try_Kalle-Live_Demo-22d3ee?style=for-the-badge)](https://pmmathias.github.io/krr-chat/)
+[![Blog Post](https://img.shields.io/badge/📖_Deep_Dive-How_It_Works-f59e0b?style=for-the-badge)](https://ki-mathias.de/en/krr-chat-explained.html)
+[![Eigenvalues & AI](https://img.shields.io/badge/🔬_Foundation-Eigenvalues_&_AI-34d399?style=for-the-badge)](https://ki-mathias.de/en/eigenvalues.html)
 
 ![No Neural Network](https://img.shields.io/badge/neural_network-NONE-ff6b6b?style=flat-square)
 ![Vanilla JS](https://img.shields.io/badge/vanilla_JS-~80_lines_matching-34d399?style=flat-square)
-![Browser](https://img.shields.io/badge/runs_in-browser_(GPU)-22d3ee?style=flat-square)
+![Browser GPU](https://img.shields.io/badge/runs_in-browser_(WebGL_GPU)-22d3ee?style=flat-square)
 ![Float64](https://img.shields.io/badge/trained-Float64_offline-f59e0b?style=flat-square)
 ![MIT](https://img.shields.io/badge/license-MIT-gray?style=flat-square)
 
@@ -19,89 +19,91 @@
 
 **The same task as GPT-4 — predict the next word — solved with eigenvalues instead of backpropagation.**
 
+### [**→ Launch Kalle in your browser**](https://pmmathias.github.io/krr-chat/)
+
 <br>
 </div>
 
 ---
 
-## Two chatbots, one principle
-
-| | λ KRR Chat (EN) | 👋 Kalle (DE) |
-|---|---|---|
-| **Language** | English (technical) | German (casual) |
-| **Corpus** | 104 sentences on eigenvalues & ML | **2113 curated dialogue pairs** |
-| **Vocabulary** | 505 words (hash encoding) | **1445 words (Word2Vec, 32-dim)** |
-| **Context** | 5 words | **24 words** |
-| **RFF dimension** | D=1536 | **D=6144** |
-| **Multi-turn** | Keyword memory | **lastBotTurn concatenation + `<that>`-pairs** |
-| **Scope handling** | — | **Honest fallback ("I can only talk about X")** |
-| **File size** | 5.8 MB | **33 MB** |
-
-[**Try KRR Chat (EN)**](https://ki-mathias.de/krr-chat.html) · [**Try Kalle (DE)**](https://ki-mathias.de/kalle-chat.html)
-
 ## What is this?
 
-Two chatbots that run entirely in your browser using **Kernel Ridge Regression** with **Random Fourier Features**. No neural networks, no backpropagation, no gradient descent — just matrix multiplication, a Gaussian kernel, and eigenvalues.
+Kalle is a bilingual chatbot (German + English) that runs **entirely in your browser** using **Kernel Ridge Regression** with **Random Fourier Features**. No neural networks, no backpropagation, no gradient descent, no server — just matrix multiplication, a Gaussian kernel, and eigenvalues. TensorFlow.js provides WebGL GPU acceleration; the model weights are embedded directly in the HTML.
 
-**KRR Chat** answers questions about eigenvalues, kernel methods, and machine learning in English.
+Kalle chats about food, hobbies, music, feelings, weather, and simple math — with multi-turn context awareness, honest scope boundaries, and **RAG** (Retrieval-Augmented Generation) over the [Eigenvalues & AI](https://ki-mathias.de/en/eigenvalues.html) blog post. Ask "What are eigenvalues?" or "How does PageRank work?" and Kalle retrieves the relevant blog section to answer.
 
-**Kalle** is a German buddy chatbot that chats about food, hobbies, music, feelings, weather, and simple math — with multi-turn context awareness and honest scope boundaries. It also answers questions about the [Eigenvalues & AI blog](https://ki-mathias.de/eigenwerte.html) via RAG (Retrieval-Augmented Generation) — without an LLM.
+## How the build works
 
-## Architecture
-
-See [`ARCHITECTURE.md`](ARCHITECTURE.md) for the full technical deep-dive. The core pipeline:
+Everything is bundled into a **single self-contained HTML file** (`index.html`, ~33 MB). No server, no API, no external dependencies at runtime.
 
 ```
-OFFLINE (Python, Float64):
-  Corpus → Word2Vec → Token contexts → RFF projection → KRR solve → Pack into HTML
+OFFLINE BUILD (Python, Float64, ~3 min on CPU)
+┌─────────────────────────────────────────────────────────┐
+│                                                         │
+│  data/corpus.md (2113 dialog pairs)                     │
+│       │                                                 │
+│       ├──→ Word2Vec (gensim, 32-dim) → embeddings       │
+│       ├──→ Token sequence (5× repeat) → RFF features    │
+│       │         └──→ W = (Z^TZ + λI)⁻¹ Z^TY   [KRR]   │
+│       ├──→ IDF weights + BoW pair embeddings             │
+│       └──→ data/chunk_index.json → RAG chunk embeddings  │
+│                                                         │
+│  All tensors → Float16 + gzip + base64                  │
+│       └──→ Injected into data/template.html             │
+│            └──→ index.html (self-contained, ~33 MB)     │
+└─────────────────────────────────────────────────────────┘
 
-ONLINE (Browser, WebGL GPU):
-  User query → Chunk retrieval (RAG) → BoW+IDF pair matching → Word-by-word rendering
+ONLINE (Browser, WebGL GPU)
+┌─────────────────────────────────────────────────────────┐
+│  1. Decompress base64 → Float16 → GPU tensors           │
+│  2. User query → chunk retrieval (RAG) → pair matching   │
+│  3. Word-by-word rendering with prediction comparison    │
+│  4. TensorFlow.js WebGL for matrix ops (<1ms/word)      │
+└─────────────────────────────────────────────────────────┘
 ```
 
-Three equations power the entire system:
+The template (`data/template.html`) contains ~80 lines of vanilla JavaScript for the matching and rendering logic. The build script (`src/build.py`) trains the model offline in Float64 for numerical precision, then quantizes to Float16 and packs everything into the template.
+
+## The math (three equations)
 
 ```python
-z(x) = sqrt(2/D) * cos(x @ omega + bias)           # Random Fourier Features
-W = solve(Z.T @ Z + lambda * I, Z.T @ Y)            # Kernel Ridge Regression
-next_word = argmax(z(context) @ W)                   # Prediction
+# 1. Random Fourier Features (Rahimi & Recht, 2007)
+z(x) = sqrt(2/D) * cos(x @ omega + bias)       # ω ~ N(0, 1/σ²)
+
+# 2. Kernel Ridge Regression (closed-form, no gradient descent)
+W = solve(Z.T @ Z + lambda * I, Z.T @ Y)        # one matrix solve
+
+# 3. Prediction (single matrix-vector multiply)
+next_word = argmax(z(context) @ W)               # <1ms on WebGL GPU
 ```
 
-No gradient descent. No epochs. One matrix solve.
+No epochs. No learning rate. No convergence monitoring. `W` is the only learned parameter (6144 × 1445 ≈ 8.9M values).
 
-## Kalle's matching pipeline
+## Key numbers
 
-```
-User: "Fisch" (after Kalle talked about pizza)
-
-1. queryText = lastBotTurn + " " + userInput
-   → "mein lieblingsessen ist pizza ... fisch"
-
-2. BoW+IDF embedding (32-dim Word2Vec)
-   → semantic query vector
-
-3. Combined scoring: 0.65 × keyword + 0.35 × semantic
-   → best matching dialogue pair
-
-4. Response from matched pair (word-by-word animation)
-
-5. Prediction Comparison: KRR's top-3 prediction per word
-   → green (agreed) / yellow (would have differed)
-```
-
-**No stemming. No substring expansion. No keyword hacks.** Just full-text BoW+IDF matching against curated dialogue pairs. The IDF weighting naturally down-weights function words.
+| Parameter | Value |
+|---|---|
+| Corpus | 2113 curated dialog pairs (DE + EN) |
+| Vocabulary | 1445 words (Word2Vec, 32-dim) |
+| Context window | 24 words |
+| RFF dimension (D) | 6144 |
+| Kernel bandwidth (σ) | 1.5 |
+| Regularization (λ) | 10⁻⁶ |
+| Top-1 accuracy | 65.4% |
+| File size | ~33 MB (self-contained HTML) |
+| Runtime | WebGL GPU via TensorFlow.js |
 
 ## Architectural properties
 
-Things that emerge **deterministically** from the BoW+IDF design — not programmed, but also not magical:
+Deterministic consequences of the BoW+IDF design — not programmed, but also not magical:
 
-- **Math validation**: Kalle asks "what is 3+5?", user says "8" → "correct! 3+5=8" — no code checks the math, it's pure pair matching on `plus 3 5 8`
+- **Math validation**: Kalle asks "what is 3+5?", user says "8" → "correct!" — pure pattern matching on `plus 3 5 8`, no code checks the math
 - **Insult immunity**: Profanity is out-of-vocabulary → invisible to the model → no filter needed
 - **Typo robustness**: OOV words from typos are silently ignored, remaining words still match
+- **Bilingual routing**: English/German words have different IDF weights → queries route to language-appropriate pairs without language detection code
 - **Honest limits**: Low confidence → "I can only talk about food, hobbies, music, feelings, weather and math"
-- **Bilingual routing**: English and German words have different IDF weights → queries automatically route to language-appropriate pairs without language detection code
 
-## The journey: Less is more
+## The journey: less is more
 
 | Iteration | Pairs | Encoding | Top-1 | Lesson |
 |---|---|---|---|---|
@@ -109,73 +111,72 @@ Things that emerge **deterministically** from the BoW+IDF design — not program
 | MEGA (mass) | 4301 | Word2Vec + hacks | 34.9% | More data = worse! |
 | **FINAL (curated)** | **2113** | **Word2Vec (32-dim)** | **65.4%** | **Curated > generated** |
 
-This mirrors what OpenAI, Anthropic and Google learned: **data quality beats data quantity**. Instruction-tuning datasets are carefully curated — just like Kalle's corpus.
+This mirrors what OpenAI, Anthropic and Google learned: **data quality beats data quantity**.
 
 ## Engineering
 
 ### Build from source
 
 ```bash
-# Prerequisites
 pip install numpy gensim
 
 # Generate corpus (optional — data/corpus.md already included)
 python3 src/gen_corpus.py
 
-# Build HTML (trains Word2Vec, solves KRR, packs into self-contained HTML)
+# Build HTML (trains Word2Vec → solves KRR → packs into self-contained HTML)
 python3 src/build.py
-# → produces kalle-chat.html (~33 MB, all weights embedded)
+# → produces index.html (~33 MB, all weights embedded, runs in any browser)
 ```
 
 ### Run tests
 
 ```bash
-# Prerequisites
 pip install playwright && playwright install chromium
 
-# Full regression suite (34 scenarios: single-turn, multi-turn, edge cases)
-python3 tests/test_regression.py kalle-chat.html
+# Full regression suite (34 scenarios)
+python3 tests/test_regression.py index.html
 
 # Filter by category
-python3 tests/test_regression.py kalle-chat.html --filter math
-python3 tests/test_regression.py kalle-chat.html --filter emotion
-
-# Custom pass threshold
-python3 tests/test_regression.py kalle-chat.html --threshold 0.9
+python3 tests/test_regression.py index.html --filter math
+python3 tests/test_regression.py index.html --filter emotion
 ```
 
 ### Run locally
 
 ```bash
-open index.html       # KRR Chat (EN)
-open kalle-chat.html  # Kalle (DE)
+git clone https://github.com/pmmathias/krr-chat.git
+cd krr-chat
+open index.html   # opens in default browser, GPU accelerated
 ```
 
-No build step needed to run — self-contained HTML files with embedded model weights.
+No build step needed to run — the HTML file is self-contained with embedded model weights.
 
 ### Project structure
 
 ```
 krr-chat/
-├── index.html              # KRR Chat (EN) — eigenvalue Q&A, 505 vocab
-├── kalle-chat.html         # Kalle (DE+EN) — dialog chatbot, 1445 vocab, RAG
+├── index.html              # The chatbot (self-contained, ~33 MB)
 ├── README.md
-├── ARCHITECTURE.md         # Full technical architecture documentation
+├── ARCHITECTURE.md         # Full technical deep-dive
 ├── src/
 │   ├── build.py            # Build pipeline: corpus → Word2Vec → KRR → HTML
-│   ├── gen_corpus.py       # Curated corpus generator (6 categories, ~2100 pairs)
+│   ├── gen_corpus.py       # Curated corpus generator (~2100 pairs)
 │   └── gen_rag_qa.py       # RAG Q&A pair generator from blog chunks
 ├── tests/
 │   └── test_regression.py  # Playwright regression suite (34 scenarios)
 └── data/
-    ├── corpus.md           # 2113 curated dialog pairs (the training data)
+    ├── corpus.md           # 2113 curated dialog pairs (training data)
     ├── chunk_index.json    # 29 blog chunks for RAG retrieval
     └── template.html       # HTML/JS template (matching + rendering logic)
 ```
 
-## Connection to the blog
+See [`ARCHITECTURE.md`](ARCHITECTURE.md) for the full technical architecture, design decisions, and mathematical foundations.
 
-Interactive companion to [Eigenwerte & KI](https://ki-mathias.de/eigenwerte.html) ([English](https://ki-mathias.de/en/eigenvalues.html)) on [ki-mathias.de](https://ki-mathias.de). The [deep-dive blog post](https://ki-mathias.de/en/krr-chat-explained.html) explains every component with mathematical rigor — from RFF kernel approximation to the eigenvalue spectrum of the training matrix.
+## Further reading
+
+- **[How KRR Chat Works](https://ki-mathias.de/en/krr-chat-explained.html)** — deep-dive blog post covering every component: from RFF kernel approximation to the eigenvalue spectrum of the training matrix
+- **[Eigenvalues & AI](https://ki-mathias.de/en/eigenvalues.html)** — the foundation: why eigenvalues connect Google PageRank, regularization, quantum mechanics, and language models
+- **[KI-Mathias Blog](https://ki-mathias.de/en/)** — all posts on the mathematical foundations of AI
 
 ## License
 
@@ -183,4 +184,6 @@ MIT
 
 ## Author
 
-[KI-Mathias](https://ki-mathias.de) (Mathias Leonhardt) — in collaboration with Claude Code (Anthropic)
+[Mathias Leonhardt](https://ki-mathias.de/en/about.html) — CTO at [pmagentur.com](https://pmagentur.com), writing about the mathematical foundations of AI at [ki-mathias.de](https://ki-mathias.de/en/)
+
+Built in collaboration with [Claude Code](https://claude.ai/code) (Anthropic)

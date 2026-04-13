@@ -85,21 +85,43 @@ The HTML template contains ~80 lines of matching logic in vanilla JavaScript. Th
 
 ```
 krr-chat/
-├── index.html              # KRR Chat (EN) — eigenvalue Q&A, 505 vocab
-├── kalle-chat.html         # Kalle (DE) — dialog chatbot, 1445 vocab
+├── index.html              # The chatbot — self-contained (~33 MB), GitHub Pages entry point
 ├── README.md
 ├── ARCHITECTURE.md         # ← you are here
 ├── src/
-│   ├── build.py            # Full build pipeline: corpus → HTML
-│   ├── gen_corpus.py       # Curated corpus generator (6 categories)
+│   ├── build.py            # Full build pipeline: corpus → Word2Vec → KRR → HTML
+│   ├── gen_corpus.py       # Curated corpus generator (6 categories, ~2100 pairs)
 │   └── gen_rag_qa.py       # RAG Q&A pair generator from blog chunks
 ├── tests/
 │   └── test_regression.py  # Playwright regression suite (34 scenarios)
 └── data/
-    ├── corpus.md           # 2113 curated dialog pairs
+    ├── corpus.md           # 2113 curated dialog pairs (the training data)
     ├── chunk_index.json    # 29 blog chunks for RAG retrieval
     └── template.html       # HTML/JS template (matching + rendering logic)
 ```
+
+## Bundling: How everything becomes one HTML file
+
+The key insight: **the entire model runs client-side**. There is no server, no API, no backend. Everything — model weights, matching logic, rendering code — is packed into a single HTML file.
+
+The build script (`src/build.py`) performs this bundling:
+
+1. **Train offline** (Python, Float64): Word2Vec embeddings, RFF projection, KRR solve
+2. **Quantize**: Float64 → Float16 (halves size, sufficient precision for inference)
+3. **Compress**: gzip level 9 on the raw Float16 bytes
+4. **Encode**: base64 for safe embedding in HTML/JavaScript
+5. **Inject**: Replace the `var M={...}` blob in `data/template.html` with the new weights
+6. **Output**: `index.html` — a self-contained HTML file (~33 MB)
+
+At runtime, the browser reverses this: base64 → gunzip → Float16 → Float32 GPU tensors (via TensorFlow.js WebGL backend). The entire decompression takes ~2 seconds on modern hardware.
+
+The template (`data/template.html`) contains:
+- ~80 lines of vanilla JS for BoW+IDF matching and scoring
+- ~40 lines for word-by-word rendering with prediction comparison
+- ~30 lines for chunk retrieval (RAG)
+- ~20 lines for multi-turn context (lastBotTurn concatenation)
+- TensorFlow.js for WebGL GPU matrix operations
+- The CSS and HTML for the chat interface
 
 ## Hyperparameters
 
