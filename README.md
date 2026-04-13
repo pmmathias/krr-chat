@@ -45,9 +45,31 @@ Two chatbots that run entirely in your browser using **Kernel Ridge Regression**
 
 **KRR Chat** answers questions about eigenvalues, kernel methods, and machine learning in English.
 
-**Kalle** is a German buddy chatbot that chats about food, hobbies, music, feelings, weather, and simple math — with multi-turn context awareness, emergent math validation, and honest scope boundaries.
+**Kalle** is a German buddy chatbot that chats about food, hobbies, music, feelings, weather, and simple math — with multi-turn context awareness and honest scope boundaries. It also answers questions about the [Eigenvalues & AI blog](https://ki-mathias.de/eigenwerte.html) via RAG (Retrieval-Augmented Generation) — without an LLM.
 
-## Kalle's architecture (new)
+## Architecture
+
+See [`ARCHITECTURE.md`](ARCHITECTURE.md) for the full technical deep-dive. The core pipeline:
+
+```
+OFFLINE (Python, Float64):
+  Corpus → Word2Vec → Token contexts → RFF projection → KRR solve → Pack into HTML
+
+ONLINE (Browser, WebGL GPU):
+  User query → Chunk retrieval (RAG) → BoW+IDF pair matching → Word-by-word rendering
+```
+
+Three equations power the entire system:
+
+```python
+z(x) = sqrt(2/D) * cos(x @ omega + bias)           # Random Fourier Features
+W = solve(Z.T @ Z + lambda * I, Z.T @ Y)            # Kernel Ridge Regression
+next_word = argmax(z(context) @ W)                   # Prediction
+```
+
+No gradient descent. No epochs. One matrix solve.
+
+## Kalle's matching pipeline
 
 ```
 User: "Fisch" (after Kalle talked about pizza)
@@ -58,7 +80,7 @@ User: "Fisch" (after Kalle talked about pizza)
 2. BoW+IDF embedding (32-dim Word2Vec)
    → semantic query vector
 
-3. Combined scoring: α × keyword + (1-α) × semantic
+3. Combined scoring: 0.65 × keyword + 0.35 × semantic
    → best matching dialogue pair
 
 4. Response from matched pair (word-by-word animation)
@@ -69,14 +91,15 @@ User: "Fisch" (after Kalle talked about pizza)
 
 **No stemming. No substring expansion. No keyword hacks.** Just full-text BoW+IDF matching against curated dialogue pairs. The IDF weighting naturally down-weights function words.
 
-## Emergent behavior
+## Architectural properties
 
-Things **nobody programmed** that emerge from pure pattern matching:
+Things that emerge **deterministically** from the BoW+IDF design — not programmed, but also not magical:
 
-- **Math validation**: Kalle asks "what is 3+5?", user says "8" → "correct! 3+5=8" — no code checks the math, it's pure pair matching
+- **Math validation**: Kalle asks "what is 3+5?", user says "8" → "correct! 3+5=8" — no code checks the math, it's pure pair matching on `plus 3 5 8`
 - **Insult immunity**: Profanity is out-of-vocabulary → invisible to the model → no filter needed
 - **Typo robustness**: OOV words from typos are silently ignored, remaining words still match
 - **Honest limits**: Low confidence → "I can only talk about food, hobbies, music, feelings, weather and math"
+- **Bilingual routing**: English and German words have different IDF weights → queries automatically route to language-appropriate pairs without language detection code
 
 ## The journey: Less is more
 
@@ -88,40 +111,71 @@ Things **nobody programmed** that emerge from pure pattern matching:
 
 This mirrors what OpenAI, Anthropic and Google learned: **data quality beats data quantity**. Instruction-tuning datasets are carefully curated — just like Kalle's corpus.
 
-## KRR Chat architecture (original)
+## Engineering
 
-```
-User question → Keyword extraction → Retrieve best matching sentence
-→ Use as seed context → KRR generation (word by word) → Color-coded output
-```
-
-- **System 1 — Retrieval**: 805 sentences (ArXiv + curated eigenvector content)
-- **System 2 — Generation**: KRR language model trained on 104 sentences (Float64 offline)
-
-## The math behind it
-
-```
-Word2Vec embeddings    → Feature map φ(x) (replaces hash encoding)
-Random Fourier Features → Kernel approximation k(x,x') ≈ z(x)ᵀz(x')
-Gaussian elimination   → Solve (ZᵀZ + λI)W = ZᵀY
-Ridge parameter λ      → Regularization = early stopping
-Eigenvalues of ZᵀZ    → What the model learns (signal) vs ignores (noise)
-```
-
-## Run locally
+### Build from source
 
 ```bash
-git clone https://github.com/pmmathias/krr-chat.git
-cd krr-chat
+# Prerequisites
+pip install numpy gensim
+
+# Generate corpus (optional — data/corpus.md already included)
+python3 src/gen_corpus.py
+
+# Build HTML (trains Word2Vec, solves KRR, packs into self-contained HTML)
+python3 src/build.py
+# → produces kalle-chat.html (~33 MB, all weights embedded)
+```
+
+### Run tests
+
+```bash
+# Prerequisites
+pip install playwright && playwright install chromium
+
+# Full regression suite (34 scenarios: single-turn, multi-turn, edge cases)
+python3 tests/test_regression.py kalle-chat.html
+
+# Filter by category
+python3 tests/test_regression.py kalle-chat.html --filter math
+python3 tests/test_regression.py kalle-chat.html --filter emotion
+
+# Custom pass threshold
+python3 tests/test_regression.py kalle-chat.html --threshold 0.9
+```
+
+### Run locally
+
+```bash
 open index.html       # KRR Chat (EN)
 open kalle-chat.html  # Kalle (DE)
 ```
 
-No build step, no server needed. Self-contained HTML files with embedded model weights.
+No build step needed to run — self-contained HTML files with embedded model weights.
+
+### Project structure
+
+```
+krr-chat/
+├── index.html              # KRR Chat (EN) — eigenvalue Q&A, 505 vocab
+├── kalle-chat.html         # Kalle (DE+EN) — dialog chatbot, 1445 vocab, RAG
+├── README.md
+├── ARCHITECTURE.md         # Full technical architecture documentation
+├── src/
+│   ├── build.py            # Build pipeline: corpus → Word2Vec → KRR → HTML
+│   ├── gen_corpus.py       # Curated corpus generator (6 categories, ~2100 pairs)
+│   └── gen_rag_qa.py       # RAG Q&A pair generator from blog chunks
+├── tests/
+│   └── test_regression.py  # Playwright regression suite (34 scenarios)
+└── data/
+    ├── corpus.md           # 2113 curated dialog pairs (the training data)
+    ├── chunk_index.json    # 29 blog chunks for RAG retrieval
+    └── template.html       # HTML/JS template (matching + rendering logic)
+```
 
 ## Connection to the blog
 
-Interactive companion to [Eigenwerte & KI](https://ki-mathias.de/eigenwerte.html) ([English](https://ki-mathias.de/en/eigenvalues.html)) on [ki-mathias.de](https://ki-mathias.de). The [Deep-Dive blog post](https://ki-mathias.de/krr-chat-erklaert.html) explains every component in detail.
+Interactive companion to [Eigenwerte & KI](https://ki-mathias.de/eigenwerte.html) ([English](https://ki-mathias.de/en/eigenvalues.html)) on [ki-mathias.de](https://ki-mathias.de). The [deep-dive blog post](https://ki-mathias.de/en/krr-chat-explained.html) explains every component with mathematical rigor — from RFF kernel approximation to the eigenvalue spectrum of the training matrix.
 
 ## License
 
