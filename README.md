@@ -77,20 +77,20 @@ W = solve(Z.T @ Z + lambda * I, Z.T @ Y)        # one matrix solve
 next_word = argmax(z(context) @ W)               # <1ms on WebGL GPU
 ```
 
-No epochs. No learning rate. No convergence monitoring. `W` is the only learned parameter (6144 × 1445 ≈ 8.9M values).
+No epochs. No learning rate. No convergence monitoring. `W` is the only learned parameter (6144 × 2952 ≈ 18.1M values).
 
 ## Key numbers
 
 | Parameter | Value |
 |---|---|
-| Corpus | 2113 curated dialog pairs (DE + EN) |
-| Vocabulary | 1445 words (Word2Vec, 32-dim) |
+| Corpus | 2174 curated dialog pairs (DE + EN) |
+| Vocabulary | 2952 words (Word2Vec, 32-dim) |
 | Context window | 24 words |
 | RFF dimension (D) | 6144 |
 | Kernel bandwidth (σ) | 1.5 |
 | Regularization (λ) | 10⁻⁶ |
-| Top-1 accuracy | 65.4% |
-| File size | ~33 MB (self-contained HTML) |
+| RAG chunks | 29 (from Eigenvalues & AI blog) |
+| File size | ~56 MB (self-contained HTML) |
 | Runtime | WebGL GPU via TensorFlow.js |
 
 ## Architectural properties
@@ -109,7 +109,7 @@ Deterministic consequences of the BoW+IDF design — not programmed, but also no
 |---|---|---|---|---|
 | V1 (original) | 57 | Hash (128 buckets) | 99.8% | Perfect but narrow |
 | MEGA (mass) | 4301 | Word2Vec + hacks | 34.9% | More data = worse! |
-| **FINAL (curated)** | **2113** | **Word2Vec (32-dim)** | **65.4%** | **Curated > generated** |
+| **FINAL (curated)** | **2174** | **Word2Vec (32-dim)** | **65.4%** | **Curated > generated** |
 
 This mirrors what OpenAI, Anthropic and Google learned: **data quality beats data quantity**.
 
@@ -125,7 +125,7 @@ python3 src/gen_corpus.py
 
 # Build HTML (trains Word2Vec → solves KRR → packs into self-contained HTML)
 python3 src/build.py
-# → produces index.html (~33 MB, all weights embedded, runs in any browser)
+# → produces index.html (~56 MB, all weights embedded, runs in any browser)
 ```
 
 ### Run tests
@@ -155,7 +155,7 @@ No build step needed to run — the HTML file is self-contained with embedded mo
 
 ```
 krr-chat/
-├── index.html              # The chatbot (self-contained, ~33 MB)
+├── index.html              # The chatbot (self-contained, ~56 MB)
 ├── README.md
 ├── ARCHITECTURE.md         # Full technical deep-dive
 ├── src/
@@ -165,7 +165,7 @@ krr-chat/
 ├── tests/
 │   └── test_regression.py  # Playwright regression suite (34 scenarios)
 └── data/
-    ├── corpus.md           # 2113 curated dialog pairs (training data)
+    ├── corpus.md           # 2174 curated dialog pairs (training data)
     ├── chunk_index.json    # 29 blog chunks for RAG retrieval
     └── template.html       # HTML/JS template (matching + rendering logic)
 ```

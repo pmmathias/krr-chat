@@ -95,7 +95,7 @@ krr-chat/
 ├── tests/
 │   └── test_regression.py  # Playwright regression suite (34 scenarios)
 └── data/
-    ├── corpus.md           # 2113 curated dialog pairs (the training data)
+    ├── corpus.md           # 2174 curated dialog pairs (the training data)
     ├── chunk_index.json    # 29 blog chunks for RAG retrieval
     └── template.html       # HTML/JS template (matching + rendering logic)
 ```
@@ -128,7 +128,7 @@ The template (`data/template.html`) contains:
 | Parameter | Value | Rationale |
 |---|---|---|
 | CTX | 24 words | Long enough for multi-turn context via lastBotTurn |
-| EMB_DIM | 32 | Word2Vec dimension — sufficient for 1445 vocab |
+| EMB_DIM | 32 | Word2Vec dimension — sufficient for 2952 vocab |
 | FEAT | 768 (24 × 32) | Context encoded as concatenated embeddings |
 | D | 6144 | RFF dimension — 8× oversampling of FEAT |
 | σ | 1.5 | Kernel bandwidth — empirical compromise (memorization vs generalization) |
@@ -149,7 +149,7 @@ where ω ~ N(0, 1/σ²), b ~ Uniform(0, 2π). This approximates the Gaussian ker
 ```
 W = (Z^TZ + λI)^-1 Z^TY
 ```
-No gradient descent. One matrix solve. W is the only learned parameter (6144 × 1445 ≈ 8.9M values).
+No gradient descent. One matrix solve. W is the only learned parameter (6144 × 2952 ≈ 18.1M values).
 
 **3. Prediction** (inference):
 ```
