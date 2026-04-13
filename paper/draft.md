@@ -32,7 +32,7 @@ $$\hat{\mathbf{y}} = X(X^\top X)^{-1} X^\top \mathbf{y}$$
 
 This requires solving the **normal equation**:
 
-$$X^\top X\,\mathbf{c} = X^\top \mathbf{y} \quad\Longrightarrow\quad \mathbf{c} = (X^\top X)^{-1} X^\top \mathbf{y} \tag{1}$$
+$$X^\top X\,\mathbf{c} = X^\top \mathbf{y} \quad\implies\quad \mathbf{c} = (X^\top X)^{-1} X^\top \mathbf{y}$$
 
 ### 2.2 Iterative Solution and the Neumann Series
 
@@ -42,11 +42,11 @@ $$\hat{\mathbf{y}}_{n+1} = \hat{\mathbf{y}}_n + X^\top(\mathbf{y} - X\hat{\mathb
 
 The residual after $n$ steps satisfies:
 
-$$\mathbf{r}_n = (I - X^\top X)^n \cdot \mathbf{y} \tag{2}$$
+$$\mathbf{r}_n = (I - X^\top X)^n \cdot \mathbf{y}$$
 
 This converges when all eigenvalues of $(I - X^\top X)$ have magnitude less than 1. The limit is the **Neumann series** — the matrix generalization of the geometric series $\sum q^k = 1/(1-q)$:
 
-$$\sum_{k=0}^{\infty} A^k = (I - A)^{-1} \quad\text{when } \rho(A) < 1 \tag{3}$$
+$$\sum_{k=0}^{\infty} A^k = (I - A)^{-1} \quad\text{when } \rho(A) < 1$$
 
 where $\rho(A)$ denotes the spectral radius. The iteration converges exactly to the closed-form solution (1). This is not coincidence — it is the same equation approached from two directions.
 
@@ -54,11 +54,11 @@ where $\rho(A)$ denotes the spectral radius. The iteration converges exactly to 
 
 Let $\mu_1, \ldots, \mu_n$ be the eigenvalues of $X^\top X$ with corresponding eigenvectors $\mathbf{v}_1, \ldots, \mathbf{v}_n$. The spectral decomposition gives:
 
-$$A^n = V \Lambda^n V^{-1} \tag{4}$$
+$$A^n = V \Lambda^n V^{-1}$$
 
 The component of the solution along the $i$-th eigenvector is retained after $n$ iterations by the factor:
 
-$$f_i^{(\text{iter})}(n) = 1 - (1 - \mu_i)^n \tag{5}$$
+$$f_i^{\,\mathrm{iter}}(n) = 1 - (1 - \mu_i)^n$$
 
 This has profound consequences:
 - **Large $\mu_i$** (strong signal): $f_i \to 1$ quickly — learned in few iterations
@@ -71,11 +71,11 @@ Early stopping is not a heuristic — it is a *spectral filter* on the eigenvalu
 
 Instead of stopping early, we can add an explicit penalty. Ridge regression solves:
 
-$$\mathbf{c}_\lambda = (X^\top X + \lambda I)^{-1} X^\top \mathbf{y} \tag{6}$$
+$$\mathbf{c}_\lambda = (X^\top X + \lambda I)^{-1} X^\top \mathbf{y}$$
 
 The filter factor for the $i$-th eigencomponent becomes:
 
-$$f_i^{(\text{ridge})}(\lambda) = \frac{\mu_i}{\mu_i + \lambda} \tag{7}$$
+$$f_i^{\,\mathrm{ridge}}(\lambda) = \frac{\mu_i}{\mu_i + \lambda}$$
 
 **Theorem (Early Stopping ≈ Ridge Regression).** The iterative filter (5) and the ridge filter (7) produce equivalent spectral filtering with the correspondence $\lambda \approx 1/n$. More iterations = less regularization. Fewer iterations = stronger smoothing. Both separate signal (large $\mu_i$) from noise (small $\mu_i$) using the eigenvalue spectrum.
 
@@ -92,43 +92,43 @@ $$f_i^{(\text{ridge})}(\lambda) = \frac{\mu_i}{\mu_i + \lambda} \tag{7}$$
 
 Real-world data is rarely linear. The kernel trick lifts data into a higher-dimensional feature space $\phi: \mathbb{R}^d \to \mathcal{H}$ where nonlinear patterns become linear, without ever computing $\phi$ explicitly. A **kernel function** computes the inner product directly:
 
-$$k(x_i, x_j) = \langle \phi(x_i), \phi(x_j) \rangle \tag{8}$$
+$$k(x_i, x_j) = \langle \phi(x_i), \phi(x_j) \rangle$$
 
 The **Gaussian (RBF) kernel**
 
-$$k(x, z) = \exp\!\left(-\frac{\|x - z\|^2}{2\sigma^2}\right) \tag{9}$$
+$$k(x, z) = \exp\!\left(-\frac{\|x - z\|^2}{2\sigma^2}\right)$$
 
 has an *infinite-dimensional* feature space, yet the kernel matrix $K \in \mathbb{R}^{n \times n}$ remains finite. The iterative update generalizes to:
 
-$$\hat{\mathbf{y}}_{n+1} = \hat{\mathbf{y}}_n + K(\mathbf{y} - \hat{\mathbf{y}}_n) \tag{10}$$
+$$\hat{\mathbf{y}}_{n+1} = \hat{\mathbf{y}}_n + K(\mathbf{y} - \hat{\mathbf{y}}_n)$$
 
 Replace $X^\top X$ with $K$. Same algorithm, same convergence analysis, same eigenvalue structure — but now with infinite expressive power.
 
 **Kernel Ridge Regression** combines (6) and (8):
 
-$$\boldsymbol{\alpha} = (K + \lambda I)^{-1} \mathbf{y} \tag{11}$$
+$$\boldsymbol{\alpha} = (K + \lambda I)^{-1} \mathbf{y}$$
 
 Prediction for a new point uses the **Representer Theorem** (Kimeldorf & Wahba, 1970): the optimal solution has the form
 
-$$f(x_*) = \sum_{i=1}^{n} \alpha_i\, k(x_i, x_*) \tag{12}$$
+$$f(x_{\ast}) = \sum_{i=1}^{n} \alpha_i\, k(x_i, x_{\ast})$$
 
 The training data *is* the model. Each training point "votes" for the prediction, weighted by kernel similarity.
 
 ### 2.6 Random Fourier Features: Making Kernels Scalable
 
-The kernel matrix $K$ is $n \times n$. For $n = 322{,}636$ training samples, this is infeasible. Rahimi & Recht (2007) showed that shift-invariant kernels can be approximated via random projection, using **Bochner's theorem**: a bounded continuous shift-invariant kernel is the Fourier transform of a non-negative measure.
+The kernel matrix $K$ is $n \times n$. For $n = 322636$ training samples, this is infeasible. Rahimi & Recht (2007) showed that shift-invariant kernels can be approximated via random projection, using **Bochner's theorem**: a bounded continuous shift-invariant kernel is the Fourier transform of a non-negative measure.
 
 For the Gaussian kernel, this yields:
 
-$$z(x) = \sqrt{\frac{2}{D}} \cos(\omega^\top x + b) \tag{13}$$
+$$z(x) = \sqrt{\frac{2}{D}} \cos(\omega^\top x + b)$$
 
 where $\omega \sim \mathcal{N}(0, \sigma^{-2} I)$ and $b \sim \text{Uniform}(0, 2\pi)$. The key property:
 
-$$z(x)^\top z(x') \approx k(x, x') \tag{14}$$
+$$z(x)^\top z(x') \approx k(x, x')$$
 
 The approximation improves with $D$. With RFF, the kernel ridge regression solution (11) becomes a standard linear system in the feature space:
 
-$$W = (Z^\top Z + \lambda I)^{-1} Z^\top Y \tag{15}$$
+$$W = (Z^\top Z + \lambda I)^{-1} Z^\top Y$$
 
 where $Z \in \mathbb{R}^{N \times D}$ is the RFF feature matrix. This is Equation (6) again — the normal equation with ridge regularization — but operating on random Fourier features instead of raw data. The eigenvalues of $Z^\top Z$ control convergence, regularization, and what the model learns. **The same equation, the same eigenvalue structure, at every level of the hierarchy.**
 
@@ -142,7 +142,7 @@ The equation $(I - A)^{-1}\mathbf{b} = \sum_{k=0}^{\infty} A^k \mathbf{b}$ appea
 
 The radiosity equation describes global illumination in computer graphics:
 
-$$\mathbf{B} = \mathbf{E} + \rho F \mathbf{B} \quad\Longrightarrow\quad \mathbf{B} = (I - \rho F)^{-1} \mathbf{E} = \sum_{k=0}^{\infty} (\rho F)^k \mathbf{E} \tag{16}$$
+$$\mathbf{B} = \mathbf{E} + \rho F \mathbf{B} \quad\implies\quad \mathbf{B} = (I - \rho F)^{-1} \mathbf{E} = \sum_{k=0}^{\infty} (\rho F)^k \mathbf{E}$$
 
 where $\mathbf{E}$ is direct emission, $\rho$ is reflectivity, and $F$ is the form factor matrix. Each term $(\rho F)^k \mathbf{E}$ represents one additional light bounce. The matrix $\rho F$ is **substochastic** (column sums $< 1$) because surfaces absorb energy. Convergence is guaranteed when $\rho({\rho F}) < 1$.
 
@@ -152,13 +152,15 @@ To make $\rho F$ stochastic (column sums $= 1$), we add an **absorber dimension*
 
 Google's PageRank (Page et al., 1998) applies the same structure to the web. The **Google matrix** is:
 
-$$G = d \cdot M + \frac{1-d}{n}\,\mathbf{1}\mathbf{1}^\top \tag{17}$$
+$$G = d \cdot M + \frac{1-d}{n}\,\mathbf{1}\mathbf{1}^\top$$
 
 where $M$ is the column-stochastic link matrix, $d \approx 0.85$ is the damping factor (analogous to reflectivity $\rho$ in radiosity), and $(1-d)/n$ is the teleportation probability (analogous to the absorber).
 
 The PageRank vector is the dominant eigenvector of $G$:
 
-$$\mathbf{r}^{(k+1)} = G\,\mathbf{r}^{(k)} \xrightarrow{k \to \infty} \mathbf{r}^* \quad\text{with } G\mathbf{r}^* = \mathbf{r}^* \tag{18}$$
+$$\mathbf{r}^{(k+1)} = G\,\mathbf{r}^{(k)} \longrightarrow \mathbf{r}^{\ast}$$
+
+with $G\mathbf{r}^{\ast} = \mathbf{r}^{\ast}$ at convergence ($k \to \infty$).
 
 The damping factor ensures $G$ is stochastic and primitive, guaranteeing a unique dominant eigenvector (Perron-Frobenius theorem). The **spectral gap** $1 - |\lambda_2|$ determines convergence speed — larger gap means faster convergence. With $d = 0.85$, $|\lambda_2| \le 0.85$, giving reliable convergence in $\sim$50–100 iterations even for billions of pages.
 
@@ -233,7 +235,9 @@ Total training time: ~3 minutes on a single CPU core. Solve time for step 5: ~2 
 
 Prediction requires one matrix-vector multiplication per word:
 
-$$\hat{w} = \text{argmax}(z(\text{context})^\top \cdot W)$$
+$$\hat{w} = \operatorname{argmax}(z(c)^\top \cdot W)$$
+
+where $c$ is the current context window.
 
 Running in <1ms per word on WebGL GPU via TensorFlow.js.
 
@@ -241,9 +245,9 @@ Running in <1ms per word on WebGL GPU via TensorFlow.js.
 
 Kalle retrieves answers from curated Q&A pairs using combined scoring:
 
-$$\text{score}(q, p) = 0.65 \cdot \text{kw}(q, p) + 0.35 \cdot \text{sem}(q, p) \tag{19}$$
+$$s(q, p) = 0.65 \cdot s_{\mathrm{kw}}(q, p) + 0.35 \cdot s_{\mathrm{sem}}(q, p)$$
 
-where $\text{kw}$ is IDF-weighted keyword overlap and $\text{sem}$ is cosine similarity of 32-dim BoW+IDF embeddings. For domain questions, a RAG pipeline injects blog context: the query is augmented to `kontext {chunk} frage {query}` and matched against context-conditioned pairs.
+where $s_{\mathrm{kw}}$ is IDF-weighted keyword overlap and $s_{\mathrm{sem}}$ is cosine similarity of 32-dim BoW+IDF embeddings. For domain questions, a RAG pipeline injects blog context: the query is augmented to `kontext {chunk} frage {query}` and matched against context-conditioned pairs.
 
 ### 5.4 Prediction Comparison: Making Memorization Visible
 
