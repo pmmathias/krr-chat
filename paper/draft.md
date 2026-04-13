@@ -66,7 +66,7 @@ where $Z$ is the RFF matrix (computed in streaming chunks of 10,000 to avoid OOM
 
 At inference time, only three operations execute per word:
 
-$$\text{next\_word} = \text{argmax}(z(\text{context})^\top \cdot W)$$
+$$\hat{w} = \text{argmax}(z(\text{context})^\top \cdot W)$$
 
 This is a single matrix-vector multiplication, running in <1ms on WebGL GPU.
 
