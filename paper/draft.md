@@ -235,7 +235,7 @@ Total training time: ~3 minutes on a single CPU core. Solve time for step 5: ~2 
 
 Prediction requires one matrix-vector multiplication per word:
 
-$$\hat{w} = \operatorname{argmax}(z(c)^\top \cdot W)$$
+$$\hat{w} = \arg\max(z(c)^\top \cdot W)$$
 
 where $c$ is the current context window.
 
