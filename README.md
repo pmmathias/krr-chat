@@ -6,6 +6,7 @@
 ### Eigenvalues, kernel ridge regression, and honest corpus engineering.
 
 [![Try Kalle](https://img.shields.io/badge/🚀_Try_Kalle-Live_Demo-22d3ee?style=for-the-badge)](https://pmmathias.github.io/krr-chat/)
+[![Paper](https://img.shields.io/badge/📄_Paper-Zenodo_(DOI)-blue?style=for-the-badge)](https://doi.org/10.5281/zenodo.19595642)
 [![Blog Post](https://img.shields.io/badge/📖_Deep_Dive-How_It_Works-f59e0b?style=for-the-badge)](https://ki-mathias.de/en/krr-chat-explained.html)
 [![Eigenvalues & AI](https://img.shields.io/badge/🔬_Foundation-Eigenvalues_&_AI-34d399?style=for-the-badge)](https://ki-mathias.de/en/eigenvalues.html)
 
@@ -13,6 +14,7 @@
 ![Vanilla JS](https://img.shields.io/badge/vanilla_JS-~80_lines_matching-34d399?style=flat-square)
 ![Browser GPU](https://img.shields.io/badge/runs_in-browser_(WebGL_GPU)-22d3ee?style=flat-square)
 ![Float64](https://img.shields.io/badge/trained-Float64_offline-f59e0b?style=flat-square)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.19595642.svg)](https://doi.org/10.5281/zenodo.19595642)
 ![MIT](https://img.shields.io/badge/license-MIT-gray?style=flat-square)
 
 <br>
