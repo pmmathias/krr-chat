@@ -10,7 +10,9 @@ Kalle von Closed-Form-Solve auf iterative GPU-Methode (Power Iteration auf stoch
 
 ## TODO
 
-(alle auf WAITING oder DONE)
+| # | Ticket | Prio | Aufwand |
+|---|--------|------|---------|
+| [T036](T036_kalle_xl_full_blog.md) | Kalle XL — experimental variant on full DE+EN blog corpus (~3K+ pairs, V≈20K) | P1 | 6–8h |
 
 ## IN PROGRESS
 
