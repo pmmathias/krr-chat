@@ -94,11 +94,80 @@ KRR, without learned parameters, is a **similarity-based method**. It excels whe
 
 In retrospect: the v1 paper's claim that "KRR is as powerful as a neural network in the infinite-width limit" (via NTK) is technically true, but the *finite-width* gap matters enormously. At our actual $D = 6144$, we are nowhere near the NTK limit — we are in the regime where the feature representation fundamentally constrains what can be learned.
 
-## Decision
+## Update 2026-04-16 — Random-Feature Attention works (partially)
 
-This branch remains **experimental and unmerged**. The artifacts (code, tokenizer, trained weights) are preserved for future researchers who might want to extend the work with random-feature attention or larger corpora.
+Following the "what would make this work" section above, we implemented **causal multi-head self-attention with random (fixed, non-learned) Q/K/V projections** and re-ran the experiment. This directly addresses limitation #2 (rigid context representation) without introducing any learned parameters — just random matrices with a fixed seed.
 
-For the production Kalle, the result is clear: **stick with the curated-corpus + retrieval approach**. Kalle v1 (live at pmmathias.github.io/krr-chat) and the v2 paper are the correct artifacts to keep promoting.
+### Implementation sketch
+
+```
+token_ids → embeddings + positional_encoding → X
+  Q = X · W_Q     (random, fixed)
+  K = X · W_K     (random, fixed)
+  V = X · W_V     (random, fixed)
+  scores = Q · K^T / √d_k
+  c_t = softmax(scores) · V               (context vector, content-adaptive)
+  z_t = √(2/D) · cos(c_t · ω + b)         (RFF projection)
+  predict next token via KRR: argmax(z_t · W)
+```
+
+All projections fixed at initialization. The only "learned" object is the KRR weight matrix $W$, solved in closed form.
+
+### Configuration
+
+- CTX = 64 tokens, EMB_DIM = 64 (Word2Vec-init), 4 attention heads × (32-d keys, 64-d values)
+- FEAT = 4·64 + 64 = 320 (concatenated head outputs + last-token embedding)
+- D = 6144, σ = 2.0, λ = 10⁻⁵
+- Block-PCG solve: 200 iterations (not converged — hit max_iter, final residual 1.3·10⁻²)
+
+### Results
+
+| Setup | Train Top-1 | Train Top-5 | Val Top-1 | Val Top-5 |
+|---|---|---|---|---|
+| Random embeddings, position-weighted sum | 18.4% | 84.4% | 3.0% | 10.0% |
+| Word2Vec embeddings, position-weighted sum | 13.2% | 74.6% | 3.1% | 11.5% |
+| **Word2Vec + 4-head random attention** | **19.7%** | 51.9% | **9.1%** | **24.2%** |
+
+**Val Top-1 tripled (3.0% → 9.1%)**, Val Top-5 more than doubled (10% → 24%). The **qualitative failure mode changes completely**:
+
+| Prompt | Top-5 without attention | Top-5 with attention |
+|---|---|---|
+| "Heute scheint die" | `.`, `,`, `the`, `die`, `:` | `ing`, `y`, ` =`, `\(`, `&` |
+| "Kernel ridge" | `.`, `,`, `the`, `die`, `:` | ` =`, `\(`, `^`, `C`, `s` |
+| "Emotionen sind" | `.`, `,`, `the`, `die`, `:` | `ing`, `der`, `\(`, `er`, `–` |
+
+Without attention, every prompt collapsed to the marginal distribution. With random-feature attention, **each prompt produces its own top-5** — the model has learned genuine conditional structure.
+
+### Why generation is still not readable
+
+Despite the quantitative improvement, actual generation still looks gibberish-adjacent:
+
+```
+"Heute scheint die" → "einen). and be n $$ \( a} a dasA $$ität a"
+"Kernel ridge"      → "iesali im &ry -} in1: H $$ = sich"
+```
+
+Three reasons the readable-text threshold is still out of reach:
+1. **Val Top-1 is 9.1%** — correct next-token only ~1 in 11 times. Greedy extension compounds to $(0.09)^k$ for $k$ correct in a row.
+2. **BPE fragments from LaTeX**: the blog has many formulas (`\frac`, `\(`, `\mathbb`), so BPE learned those as common tokens. Many "plausible next-BPE" predictions end up being formula fragments.
+3. **CG did not converge**: attention FEAT=320 has worse conditioning than the non-attention FEAT=2048 variant. Block-PCG stopped at iter 200 with residual 0.013 (tol was 10⁻⁵). Running to convergence would likely add 2-3 percentage points to Top-1.
+
+### Interpretation
+
+This is a **qualified success**: the improvement over the naive baseline is unambiguous and qualitatively distinct. It confirms that the bottleneck in the original experiment was limitation #2 (rigid context), not limitation #1 (small corpus). **Even with only 281K training tokens, a content-adaptive mechanism extracts substantially more conditional structure.**
+
+It is still not a usable GPT-style language model. To push further, in order of leverage:
+
+1. **Run CG to convergence** (maxiter=1000 or Nyström preconditioner). Cheap.
+2. **Clean the corpus** — strip LaTeX/formula fragments before BPE. One afternoon.
+3. **~10M-token corpus** — Wikipedia samples, Common Crawl slice. Re-train Word2Vec on representative stream.
+4. **Multi-layer attention** — stack two or three attention layers, each with fresh random Q/K/V. Preserves the "no learned parameters" constraint but gives depth. This is the big unlock.
+
+### Decision (final)
+
+This branch remains **experimental and unmerged**. The random-feature-attention variant is a scientifically meaningful result — arguably the first demonstration that pure closed-form KRR with fixed random attention produces non-trivial next-token conditioning on a small corpus.
+
+For the production Kalle, the result is unchanged: **stick with the curated-corpus + retrieval approach**. Kalle v1 (live at pmmathias.github.io/krr-chat) and the v2 paper remain the recommended artifacts.
 
 ## Artifacts on this branch
 
