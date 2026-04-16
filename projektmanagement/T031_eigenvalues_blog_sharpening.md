@@ -1,7 +1,9 @@
 # T031: Eigenwerte-Blogpost schärfen — Absorber als Algorithmus, nicht nur Analogie
 
-**Status:** IN PROGRESS
+**Status:** DONE
 **Begonnen:** 2026-04-16
+**Abgeschlossen:** 2026-04-16
+**Output:** Neue Sektion "Why making the matrix stochastic matters" in `eigenvalues.html` (EN) und `eigenwerte.html` (DE)
 **Priorität:** P1
 **Geschätzter Aufwand:** 3-4h
 **Abhängig von:** T028

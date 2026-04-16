@@ -1,6 +1,7 @@
 # T032: Paper v2 — Überarbeitung mit Power-Iteration-Sektion
 
-**Status:** TODO
+**Status:** IN PROGRESS
+**Begonnen:** 2026-04-16
 **Priorität:** P1
 **Geschätzter Aufwand:** 4-5h
 **Abhängig von:** T030 (Benchmarks), T031 (Blog-Schärfung als Referenz)

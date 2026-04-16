@@ -3,3 +3,6 @@ __pycache__/
 .DS_Store
 *.egg-info/
 krr-chat-legacy.html
+paper/latex/main.aux
+paper/latex/main.log
+paper/latex/main.out

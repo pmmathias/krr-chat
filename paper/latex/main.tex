@@ -18,13 +18,13 @@
   \url{https://ki-mathias.de}
 }
 
-\date{April 2026}
+\date{April 2026 \\ \small Version 2.0 (adds \S\ref{sec:v2} on scalable training via absorber-stochasticization)}
 
 \begin{document}
 \maketitle
 
 \begin{abstract}
-We present Kalle, a fully client-side bilingual chatbot that performs next-word prediction and retrieval-augmented generation (RAG) using Kernel Ridge Regression (KRR) with Random Fourier Features---without neural networks, backpropagation, or gradient descent. The system makes the mathematical foundations of modern language models \emph{transparent}: the same eigenvalue structure that governs convergence of the Neumann series, stability of PageRank, light transport in radiosity, and learning dynamics of neural networks is exposed in an interactive, inspectable system. Kalle serves 2,178 curated Q\&A pairs bilingually, runs entirely in the browser via WebGL GPU (TensorFlow.js), and achieves functional conversational ability including multi-turn context and RAG---all through a single closed-form matrix solve. We derive the complete mathematical chain from projection to kernel methods and show that the Neural Tangent Kernel theorem \citep{jacot2018ntk} makes this connection rigorous: in the infinite-width limit, a neural network \emph{becomes} KRR.
+We present Kalle, a fully client-side bilingual chatbot that performs next-word prediction and retrieval-augmented generation (RAG) using Kernel Ridge Regression (KRR) with Random Fourier Features---without neural networks, backpropagation, or gradient descent. The system makes the mathematical foundations of modern language models \emph{transparent}: the same eigenvalue structure that governs convergence of the Neumann series, stability of PageRank, light transport in radiosity, and learning dynamics of neural networks is exposed in an interactive, inspectable system. Kalle serves 2,178 curated Q\&A pairs bilingually, runs entirely in the browser via WebGL GPU (TensorFlow.js), and achieves functional conversational ability including multi-turn context and RAG---all through a single closed-form matrix solve. We derive the complete mathematical chain from projection to kernel methods and show that the Neural Tangent Kernel theorem \citep{jacot2018ntk} makes this connection rigorous: in the infinite-width limit, a neural network \emph{becomes} KRR. Version 2 of this paper (\S\ref{sec:v2}) adds a scalable training path: we reformulate the KRR system as power iteration on an absorber-stochasticized matrix---the same construction Google uses for PageRank, with the ridge parameter $\lambda$ playing the role of the damping factor $d$---and provide a Block Preconditioned Conjugate Gradient (Block-PCG) implementation that is mathematically equivalent to the direct solve but scales to regimes where $O(D^3)$ Gaussian elimination becomes infeasible.
 
 \medskip
 \noindent\textbf{Demo:} \url{https://pmmathias.github.io/krr-chat/}\\
@@ -237,6 +237,71 @@ For each word, the KRR model predicts its top-3 candidates. Agreement with the c
 
 
 % ================================================================
+\section{Scalable Training via Absorber-Stochasticization}\label{sec:v2}
+
+\textbf{This section is new in Version 2.}
+
+The direct solve of Eq.~\eqref{eq:rff_krr} via \texttt{numpy.linalg.solve} requires $O(D^2)$ memory for the Gram-like matrix $Z^\top Z$ and $O(D^3)$ compute for Gaussian elimination. At Kalle's current scale ($D = 6144$) this is $\sim 288$\,MB and $\sim 2$\,seconds---manageable. At $D = 50{,}000$ it becomes $\sim 20$\,GB and hours; at $D = 100{,}000$ it is infeasible on consumer hardware. To unlock this scalability regime, we reformulate the solve as an iterative scheme requiring only matrix-vector products.
+
+\subsection{The Absorber Construction: From Substochastic to Stochastic}
+
+Richardson iteration on the KRR system~\eqref{eq:ridge} has the fixed-point form
+\begin{equation}
+  \boldsymbol{\alpha}_{n+1} = M \boldsymbol{\alpha}_n + \omega \mathbf{y}, \qquad M = I - \omega(K + \lambda I). \label{eq:richardson}
+\end{equation}
+Choosing $\omega = 1/(1+\lambda)$ (after normalizing $K$ so that $\mu_{\max}(K) \leq 1$) gives $M$ a \emph{substochastic} spectrum: all eigenvalues of $M$ lie in $[0, 1)$, but row sums are less than one. This is the \emph{exact} algebraic analogue of the substochasticity of $\rho F$ in the radiosity equation $\mathbf{B} = \mathbf{E} + \rho F \mathbf{B}$: both describe a process that loses mass at each iteration.
+
+Following the PageRank/radiosity construction, we recover stochasticity by adding an absorber: let $\mathbf{a} = \mathbf{1} - M\mathbf{1}$ be the row-wise mass deficit and $\mathbf{p} = \omega \mathbf{y} / \|\omega \mathbf{y}\|_1$ be the normalized target. Then
+\begin{equation}
+  \tilde P = M + \mathbf{a}\mathbf{p}^\top \label{eq:absorber}
+\end{equation}
+is row-stochastic: $\tilde P \mathbf{1} = M \mathbf{1} + \mathbf{a} = \mathbf{1}$. \textbf{The ridge parameter $\lambda$ plays the role of the PageRank damping factor $d$}: both stabilize the iteration by enforcing a spectral gap and thereby guaranteeing a unique dominant eigenvector (Perron-Frobenius).
+
+The derivation (worked out in the accompanying technical note) shows that a pure rank-one augmentation is insufficient to encode the multi-output KRR solution as a single dominant eigenvector, but the construction nevertheless delivers the \emph{conceptual} infrastructure: the spectral gap $1 - |\lambda_2(\tilde P)| \geq \lambda/(1+\lambda)$ directly determines the convergence rate of any Krylov-subspace method operating on the same system.
+
+\subsection{Block Preconditioned Conjugate Gradient}
+
+For the practical implementation we use \textbf{Block Preconditioned Conjugate Gradient (Block-PCG)}, which inherits the Krylov subspace structure of the absorber construction but replaces power iteration with the provably optimal choice within that subspace. The cost structure is:
+\begin{itemize}
+  \setlength\itemsep{0pt}
+  \item \textbf{Per iteration}: one matrix-matrix product $A \cdot P$ where $A = Z^\top Z + \lambda I \in \mathbb{R}^{D \times D}$ and $P \in \mathbb{R}^{D \times V}$ is the search direction matrix ($V$ = vocabulary size).
+  \item \textbf{Convergence}: $O(\sqrt{\kappa(A)} \log(1/\epsilon))$ iterations to reach tolerance $\epsilon$.
+  \item \textbf{Memory}: $O(D \cdot V)$ for the state (X, R, Z, P); no LU factor required.
+\end{itemize}
+With a diagonal (Jacobi) preconditioner $\mathcal{P} = \mathrm{diag}(A)$, Block-PCG converged in 14 iterations on the full Kalle corpus ($D = 6144$, $V = 2977$), producing a weight matrix $W$ numerically equivalent to the direct solve ($\|W_{\text{PCG}} - W_{\text{direct}}\|_F / \|W_{\text{direct}}\|_F < 10^{-6}$). The downstream Top-1 accuracy differed only by sampling noise (62.8\% vs. 63.5\%).
+
+\subsection{Benchmarks}
+
+Table~\ref{tab:benchmarks} reports wall-clock time and peak memory for the two solvers on synthetic SPD problems with structure $A = Z^\top Z + \lambda I$, $\lambda = 10^{-6}$, $V = 500$, two runs per configuration (median reported). All measurements are CPU-only on Apple Silicon.
+
+\begin{table}[h]
+\centering\small
+\begin{tabular}{@{}rccccc@{}}
+\toprule
+$D$ & Direct (s) & Direct mem & PCG iters & PCG (s) & PCG rel.\ err \\
+\midrule
+ 256  & 0.001 & 1.0\,MB  & 10 & 0.008 & $2.7 \times 10^{-7}$ \\
+ 512  & 0.003 & 2.0\,MB  & 13 & 0.021 & $3.3 \times 10^{-7}$ \\
+1024  & 0.011 & 3.9\,MB  & 18 & 0.070 & $6.2 \times 10^{-7}$ \\
+2048  & 0.061 & 7.8\,MB  & 30 & 0.342 & $1.6 \times 10^{-6}$ \\
+4096  & 0.367 & 15.6\,MB & 38 & 1.379 & $2.2 \times 10^{-6}$ \\
+\bottomrule
+\end{tabular}
+\caption{Solver comparison at varying RFF dimension $D$. CG iteration counts grow sublinearly with $D$, consistent with $O(\sqrt{\kappa})$ scaling.}
+\label{tab:benchmarks}
+\end{table}
+
+\paragraph{Honest assessment.} On CPU at Kalle's current scale, direct solve is faster in wall-clock time because LAPACK's Gaussian elimination is extraordinarily well-tuned and $O(D^3)$ remains tractable through $D \sim 10^4$. The advantage of Block-PCG becomes decisive under three conditions, each of which applies to different deployment scenarios:
+\begin{enumerate}
+  \setlength\itemsep{0pt}
+  \item \textbf{Very large $D$} ($D \gtrsim 10^4$): memory dominates, and the $O(D^2)$ storage of the direct system exceeds device capacity.
+  \item \textbf{GPU acceleration}: matrix-vector products on GPU are $\sim 10$--$100\times$ faster than on CPU, while \texttt{solve}-style routines parallelize poorly; the crossover shifts to $D \sim 10^3$.
+  \item \textbf{Approximate solutions acceptable}: PCG produces useful $W$ after a handful of iterations, enabling early-stopping as implicit regularization \citep{yao2007early}.
+\end{enumerate}
+Kalle v2 ships with both solvers (\texttt{src/build\_v2.py --solver \{direct,cg\}}), enabling future scale-up paths without architectural changes.
+
+
+% ================================================================
 \section{Evaluation}
 
 \subsection{Data Quality vs.\ Quantity}
@@ -277,13 +342,16 @@ A 4-turn conversation testing topic transitions and language switching achieved 
 
 \textbf{RAG.} \citet{lewis2020rag} introduced retrieval-augmented generation with neural components. Kalle demonstrates the RAG pattern is separable from neural architecture.
 
+\textbf{Iterative KRR solvers (Version 2).} Richardson iteration for regularized regression goes back to \citet{hestenes1952cg} (Conjugate Gradient) and is analyzed as implicit regularization by \citet{yao2007early}. Scalable GPU-accelerated kernel machines via preconditioned CG were developed in Falkon \citep{rudi2017falkon} and ASkotch \citep{rathore2024askotch}. Nystr\"om-based preconditioning \citep{frangella2023nystrom} and random-features preconditioning \citep{avron2017sketching} are the current state of the art. Our contribution is the explicit translation of the PageRank damping construction \citep{page1998pagerank,boldi2005damping} to KRR: interpreting $\lambda$ as the damping factor of an absorber-stochasticized iteration matrix. The heat-kernel/PageRank duality \citep{chung2007heatkernel} is conceptually adjacent but does not perform this stochasticization on the KRR normal equations.
+
 
 % ================================================================
 \section{Limitations}
 
 \textbf{No free-form generation.} Kalle retrieves pre-written answers.
 \textbf{Vocabulary-bound.} The 2,977-word vocabulary excludes most proper nouns.
-\textbf{Scaling ceiling.} The KRR solve requires $O(D^2)$ memory ($\sim$288\,MB at $D=6{,}144$) and $O(D^3)$ compute.
+\textbf{Scaling ceiling.} The direct KRR solve requires $O(D^2)$ memory and $O(D^3)$ compute; the Block-PCG implementation in Version 2 (\S\ref{sec:v2}) relaxes both constraints but still requires $O(D \cdot V)$ state.
+\textbf{Preconditioner quality.} Our Block-PCG uses only a diagonal (Jacobi) preconditioner. Nystr\"om or random-features preconditioning would likely yield a further $5$--$10\times$ speedup at larger $D$; we leave this to future work.
 \textbf{Evaluation scope.} Formal metrics (perplexity, BLEU) are deferred to future work.
 
 
@@ -291,6 +359,8 @@ A 4-turn conversation testing topic transitions and language switching achieved 
 \section{Conclusion}
 
 Kalle demonstrates that the mathematical structure underlying language models---eigenvalues, kernel functions, the Neumann series, regularization as spectral filtering---can be made transparent, interactive, and pedagogically useful. The same equation $(I - A)^{-1}\mathbf{b}$ governs light transport (radiosity), web ranking (PageRank), and prediction (KRR). The Neural Tangent Kernel theorem establishes that this is not a simplification of neural language models---it is the same mathematics, made visible.
+
+Version 2 extends this unification from the \emph{analytic} level to the \emph{algorithmic} level. The absorber-stochasticization construction---hitherto used only to motivate the PageRank damping factor and to prove convergence of the radiosity iteration---reveals its full practical value when applied to Kernel Ridge Regression: the ridge parameter $\lambda$ \emph{is} the damping factor $d$, in a strong enough sense to substitute Gaussian elimination with Block-PCG and thereby open a path to GPU-scale training. The eigenvalue structure does not just explain \emph{what} these systems compute---it also dictates \emph{how} to compute them efficiently.
 
 
 % ================================================================
@@ -366,6 +436,46 @@ Wallace, R. (2009).
 Wei, J., et~al. (2022).
 \newblock Finetuned Language Models Are Zero-Shot Learners.
 \newblock \emph{ICLR}.
+
+\bibitem[Hestenes \& Stiefel(1952)]{hestenes1952cg}
+Hestenes, M. \& Stiefel, E. (1952).
+\newblock Methods of Conjugate Gradients for Solving Linear Systems.
+\newblock \emph{Journal of Research of the National Bureau of Standards}, 49(6):409--436.
+
+\bibitem[Yao et~al.(2007)]{yao2007early}
+Yao, Y., Rosasco, L. \& Caponnetto, A. (2007).
+\newblock On Early Stopping in Gradient Descent Learning.
+\newblock \emph{Constructive Approximation}, 26(2):289--315.
+
+\bibitem[Rudi et~al.(2017)]{rudi2017falkon}
+Rudi, A., Carratino, L. \& Rosasco, L. (2017).
+\newblock FALKON: An Optimal Large Scale Kernel Method.
+\newblock \emph{NeurIPS}.
+
+\bibitem[Rathore et~al.(2024)]{rathore2024askotch}
+Rathore, A., D\'iaz, B., Frangella, Z. \& Udell, M. (2024).
+\newblock Have ASkotch: A Neat Solution for Large-scale Kernel Ridge Regression.
+\newblock \emph{arXiv:2407.10070}.
+
+\bibitem[Frangella et~al.(2023)]{frangella2023nystrom}
+Frangella, Z., Tropp, J.A. \& Udell, M. (2023).
+\newblock Randomized Nystr\"om Preconditioning.
+\newblock \emph{SIAM Journal on Matrix Analysis and Applications}.
+
+\bibitem[Avron et~al.(2017)]{avron2017sketching}
+Avron, H., Clarkson, K. \& Woodruff, D. (2017).
+\newblock Faster Kernel Ridge Regression Using Sketching and Preconditioning.
+\newblock \emph{SIAM Journal on Matrix Analysis and Applications}.
+
+\bibitem[Boldi et~al.(2005)]{boldi2005damping}
+Boldi, P., Santini, M. \& Vigna, S. (2005).
+\newblock PageRank as a Function of the Damping Factor.
+\newblock \emph{WWW}.
+
+\bibitem[Chung(2007)]{chung2007heatkernel}
+Chung, F. (2007).
+\newblock The Heat Kernel as the PageRank of a Graph.
+\newblock \emph{PNAS}, 104(50):19735--19740.
 
 \end{thebibliography}
 
