@@ -320,6 +320,27 @@ Block-PCG (PyTorch MPS / Apple GPU, Float32) & \textbf{1622} & 11 & $1.0 \times 
 
 For completeness, we note that the linear solve represents only $2$--$7\%$ of Kalle's total training time ($\sim 100$ s end-to-end on this hardware). The remainder is dominated by streaming $Z^\top Z$ accumulation ($\sim 45$ s) and HTML packaging/base64 encoding ($\sim 40$ s). Block-PCG's value at this scale is therefore not a training-time reduction but rather the opening of a GPU scaling path; at larger $D$ where the solve dominates, the speedup becomes primary. Kalle v2 ships with all three NumPy solvers (\texttt{src/build\_v2.py --solver \{direct,cg,power\}}); the PyTorch variants are in \texttt{src/benchmark\_real\_kalle.py} as reference implementations.
 
+\subsection{Corpus-scaling test: does the solver share grow with more data?}
+
+A natural follow-up question is whether the $2$--$7\%$ solve share is an artifact of Kalle's small corpus. We tested this by extending the training data with the full ki-mathias.de blog content (197K additional tokens, 30 articles in DE and EN), yielding three scale regimes at fixed $D = 6144$:
+
+\begin{table}[h]
+\centering\small
+\begin{tabular}{@{}lrrrrr@{}}
+\toprule
+Scenario & $N$ & $V$ & Accum & Solve & Solve\,\% \\
+\midrule
+kalle (baseline)         & 323\,K  & 2{,}977  &  45\,s & 2.4\,s & 5.0 \\
+kalle + blog             & 1.3\,M  & 19{,}411 & 190\,s & 10.2\,s & 4.9 \\
+kalle + blog $\times 2$  & 2.3\,M  & 19{,}411 & 325\,s & 9.8\,s & 2.7 \\
+\bottomrule
+\end{tabular}
+\caption{Training-time decomposition as $N$ (samples) grows by $7\times$. Accumulation scales linearly with $N$; solve scales with $V$ (which jumped once from 2{,}977 to 19{,}411 and then stayed fixed). The solver's relative share remains essentially constant at $3$--$5\%$.}
+\label{tab:scaling}
+\end{table}
+
+Table~\ref{tab:scaling} reveals a structural property of the pipeline: the solve cost depends on $V$ and $D$ but not on $N$, while accumulation is $O(N \cdot D^2)$. The solver share therefore stabilizes rather than growing with corpus size. The lever that would make the solver dominant is $D$: at $D = 50{,}000$ the direct solve's $O(D^3)$ cost and $O(D^2)$ memory become prohibitive, and iterative methods become essential. An additional observation from the scaling test: with more diverse data ($V$ rising from $2{,}977$ to $19{,}411$), the effective condition number of $Z^\top Z + \lambda I$ \emph{improves}, and Block-PCG needed \textbf{only 7--8 iterations} instead of 20 --- consistent with the $O(\sqrt{\kappa})$ theory and, encouragingly, the opposite of the naive expectation that larger problems are harder to iteratively solve.
+
 
 % ================================================================
 \section{Evaluation}

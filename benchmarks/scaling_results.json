@@ -1,0 +1,110 @@
+[
+  {
+    "N": 322636,
+    "V": 2977,
+    "D": 6144,
+    "solver": "direct",
+    "device": null,
+    "t_w2v": 0.14852666854858398,
+    "t_accum": 44.90958285331726,
+    "t_solve": 2.375410318374634,
+    "iters": 1,
+    "scenario": "kalle"
+  },
+  {
+    "N": 322636,
+    "V": 2977,
+    "D": 6144,
+    "solver": "cg_torch",
+    "device": "cpu",
+    "t_w2v": 0.1336209774017334,
+    "t_accum": 46.48587965965271,
+    "t_solve": 3.772792100906372,
+    "iters": 20,
+    "scenario": "kalle"
+  },
+  {
+    "N": 322636,
+    "V": 2977,
+    "D": 6144,
+    "solver": "cg_torch",
+    "device": "mps",
+    "t_w2v": 0.13041305541992188,
+    "t_accum": 46.52542805671692,
+    "t_solve": 2.192603826522827,
+    "iters": 21,
+    "scenario": "kalle"
+  },
+  {
+    "N": 1309526,
+    "V": 19411,
+    "D": 6144,
+    "solver": "direct",
+    "device": null,
+    "t_w2v": 0.5807950496673584,
+    "t_accum": 197.18889713287354,
+    "t_solve": 10.202932834625244,
+    "iters": 1,
+    "scenario": "kalle+blog"
+  },
+  {
+    "N": 1309526,
+    "V": 19411,
+    "D": 6144,
+    "solver": "cg_torch",
+    "device": "cpu",
+    "t_w2v": 0.6134181022644043,
+    "t_accum": 189.90125966072083,
+    "t_solve": 10.85823106765747,
+    "iters": 8,
+    "scenario": "kalle+blog"
+  },
+  {
+    "N": 1309526,
+    "V": 19411,
+    "D": 6144,
+    "solver": "cg_torch",
+    "device": "mps",
+    "t_w2v": 0.5966720581054688,
+    "t_accum": 189.39073395729065,
+    "t_solve": 6.740478992462158,
+    "iters": 7,
+    "scenario": "kalle+blog"
+  },
+  {
+    "N": 2296416,
+    "V": 19411,
+    "D": 6144,
+    "solver": "direct",
+    "device": null,
+    "t_w2v": 0.9615681171417236,
+    "t_accum": 349.9645998477936,
+    "t_solve": 9.748329877853394,
+    "iters": 1,
+    "scenario": "kalle+blog\u00d72"
+  },
+  {
+    "N": 2296416,
+    "V": 19411,
+    "D": 6144,
+    "solver": "cg_torch",
+    "device": "cpu",
+    "t_w2v": 0.9266681671142578,
+    "t_accum": 324.65968680381775,
+    "t_solve": 10.470490217208862,
+    "iters": 7,
+    "scenario": "kalle+blog\u00d72"
+  },
+  {
+    "N": 2296416,
+    "V": 19411,
+    "D": 6144,
+    "solver": "cg_torch",
+    "device": "mps",
+    "t_w2v": 0.9393260478973389,
+    "t_accum": 323.9756832122803,
+    "t_solve": 18.351075887680054,
+    "iters": 7,
+    "scenario": "kalle+blog\u00d72"
+  }
+]

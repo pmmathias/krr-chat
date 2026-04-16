@@ -52,6 +52,18 @@ For GPU implementations, the story reverses even earlier: matrix-vector products
 
 With tolerance $10^{-6}$, Block-PCG produces solutions within $\sim 10^{-6}$ relative Frobenius error of the Direct Solve reference. This is sufficient for the downstream task (argmax of score vectors), as confirmed by our downstream integration test on Kalle (Top-1 accuracy: 62.8% vs. 63.5% for direct — within sampling noise).
 
+## Follow-up: Corpus scaling — does the solver matter more with more data?
+
+We also tested whether the $5\%$ solve share holds when the corpus grows to include the full ki-mathias.de blog (+197K tokens, 30 articles). See [`scaling_results.md`](scaling_results.md). Summary:
+
+| Scenario | N samples | V vocab | Accum | Solve | Solve % |
+|---|---|---|---|---|---|
+| kalle (baseline) | 323K | 2.9K | 45 s | 2.4 s | 5.0% |
+| kalle + blog | 1.3M | 19.4K | 190 s | 10.2 s | 4.9% |
+| kalle + blog × 2 | 2.3M | 19.4K | 325 s | 9.8 s | **2.7%** |
+
+**The solver share is essentially constant across a 7× increase in N** — because accumulation is $O(N \cdot D^2)$ and the solve is $O(D^2 \cdot V)$, independent of $N$. More data makes accumulation expensive, not the solver. The lever that *would* make the solver dominant is $D$ (RFF dimension), not $N$ (samples). A pleasant side finding: with more diverse data, the condition number improves and Block-PCG needed only 7–8 iterations instead of 20 — the opposite of the naive expectation.
+
 ## Follow-up: PyTorch / Apple MPS on the real Kalle matrices
 
 The synthetic-problem table above uses pure NumPy for both solvers, which is a fair apples-to-apples comparison but underestimates what Block-PCG can deliver in practice. On the **actual Kalle training matrices** ($D = 6144$, $V = 2977$), with different linear-algebra back-ends:
