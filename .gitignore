@@ -11,3 +11,6 @@ kalle-xl.html
 data/corpus-xl.md
 data/chunk_index_xl.json
 data/autoregressive/model.pkl
+data/autoregressive/model_attention_clean.pkl
+data/autoregressive/model_attention.pkl
+data/autoregressive/model.pkl

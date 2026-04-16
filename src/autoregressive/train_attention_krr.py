@@ -42,9 +42,13 @@ VALIDATION_FRAC = 0.05
 REPEAT = int(os.environ.get('REPEAT', 1))
 
 DATA_DIR = '/Users/mathiasleonhardt/Dev/krr-chat/data/autoregressive'
-CORPUS_TXT = f'{DATA_DIR}/corpus.txt'
-TOKENIZER = f'{DATA_DIR}/bpe_tokenizer.json'
-MODEL_OUT = f'{DATA_DIR}/model_attention.pkl'
+# Overridable via env vars so one script can run multiple experiments
+CORPUS_TXT = os.environ.get('CORPUS',    f'{DATA_DIR}/corpus.txt')
+TOKENIZER  = os.environ.get('TOKENIZER', f'{DATA_DIR}/bpe_tokenizer.json')
+MODEL_OUT  = os.environ.get('OUTPUT',    f'{DATA_DIR}/model_attention.pkl')
+# CG config overrideable (for T039 convergence experiments)
+CG_MAX_ITER = int(os.environ.get('CG_MAX_ITER', 200))
+CG_TOL      = float(os.environ.get('CG_TOL', 1e-5))
 
 np.random.seed(SEED)
 
@@ -199,7 +203,7 @@ def main():
     print("\nSolving via Block-PCG...")
     t0 = time.time()
     W64, info = krr_solve(ZtZ, ZtY, solver='cg',
-                          tol=1e-5, max_iter=200,
+                          tol=CG_TOL, max_iter=CG_MAX_ITER,
                           preconditioner='diagonal', verbose=False)
     t_solve = time.time() - t0
     W = W64.astype(np.float32)
