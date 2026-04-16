@@ -8,13 +8,24 @@
 
 Kalle von Closed-Form-Solve auf iterative GPU-Methode (Power Iteration auf stochastisierter Matrix / Conjugate Gradient) umstellen. Die im Eigenwerte-Blogpost skizzierte Absorber-Idee wird als **Algorithmus-Optimierung** ausgearbeitet, nicht nur als Analogie. Paper v2 wird als neue Version auf Zenodo publiziert. Beide Blogposts werden aktualisiert.
 
-## TODO
+## TODO — AR-KRR Research Sprint (T038 Meta)
 
-(leer)
+| # | Ticket | Prio | Abhängig von | Erw. Aufwand |
+|---|--------|------|--------------|---------------|
+| [T039](T039_cg_convergence.md) | CG zu Konvergenz | P0 | — | 30 min |
+| [T042](T042_corpus_cleaning.md) | Corpus Cleaning (LaTeX raus) | P0 | — | 1h |
+| [T040](T040_multilayer_attention.md) | Multi-Layer Attention (erwarteter Hebel) | P0 | — | 4h |
+| [T041](T041_attention_hyperparams.md) | Attention-Hyperparams Sweep | P1 | T040 | 4h |
+| [T043](T043_corpus_expansion.md) | Corpus-Expansion ~10M Tokens | P1 | T042 | 6h |
+| [T044](T044_rff_scaling.md) | RFF D hochskalieren | P2 | — | 3h |
+| [T045](T045_grid_search.md) | Kombinierte Grid Search | P1 | T039–T044 | 6h |
+| [T046](T046_synthesis_report.md) | Synthese-Report | P0 | alle obigen | 2h |
 
 ## IN PROGRESS
 
-(leer)
+| # | Ticket | Seit |
+|---|--------|------|
+| [T038](T038_ar_krr_research_roadmap.md) | AR-KRR Research Roadmap (Meta) | 2026-04-16 |
 
 ## WAITING
 
@@ -34,6 +45,7 @@ Kalle von Closed-Form-Solve auf iterative GPU-Methode (Power Iteration auf stoch
 | [T034](T034_krr_chat_blog_update.md) | KRR-Chat-Blog updaten | 2026-04-16 | Neue Sektion "Scalable training: ridge λ as damping factor" (DE+EN) |
 | [T035](T035_repo_documentation.md) | Repo-Doku updaten | 2026-04-16 | README, ARCHITECTURE.md, CONTENT_SEO_STRATEGY.md aktualisiert |
 | [T036](T036_kalle_xl_full_blog.md) | Kalle XL (experimental) | 2026-04-16 | **7/20 smoke test (35%)** — bestätigt empirisch v1 "less is more". Pipeline ok, aber auto-Q&A zu schwach. Siehe VARIANTS.md |
+| [T037](T037_autoregressive_krr.md) | Autoregressive KRR (Branch) | 2026-04-16 | **Val Top-1 3% → 9.1% mit Random-Feature Attention**. Content-adaptive Aggregation ist der Hebel, aber Generation noch nicht lesbar. Weiter-Exploration via T038. |
 
 ## Abhängigkeits-Flow (final)
 

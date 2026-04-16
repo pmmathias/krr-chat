@@ -10,3 +10,8 @@ paper/latex/main.out
 kalle-xl.html
 data/corpus-xl.md
 data/chunk_index_xl.json
+<<<<<<< Updated upstream
+=======
+data/autoregressive/model.pkl
+data/autoregressive/model_attention.pkl
+>>>>>>> Stashed changes
