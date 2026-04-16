@@ -15,3 +15,4 @@ data/autoregressive/model_attention_clean.pkl
 data/autoregressive/model_attention.pkl
 data/autoregressive/model.pkl
 data/autoregressive/model_attention_cg_conv.pkl
+data/autoregressive/model_multilayer_L2.pkl
