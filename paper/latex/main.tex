@@ -272,7 +272,7 @@ With a diagonal (Jacobi) preconditioner $\mathcal{P} = \mathrm{diag}(A)$, Block-
 
 \subsection{Benchmarks}
 
-Table~\ref{tab:benchmarks} reports wall-clock time and peak memory for the two solvers on synthetic SPD problems with structure $A = Z^\top Z + \lambda I$, $\lambda = 10^{-6}$, $V = 500$, two runs per configuration (median reported). All measurements are CPU-only on Apple Silicon.
+We measure in two regimes. First, synthetic SPD problems with structure $A = Z^\top Z + \lambda I$, $\lambda = 10^{-6}$, $V = 500$, to observe the scaling of CG iteration count with $D$ (Table~\ref{tab:benchmarks-synth}). Second, the actual Kalle training matrices reconstructed from the real corpus ($D = 6144$, $V = 2977$) with four back-ends: NumPy direct, NumPy Block-PCG, PyTorch CPU Block-PCG, and PyTorch MPS (Apple Silicon GPU) Block-PCG (Table~\ref{tab:benchmarks-real}).
 
 \begin{table}[h]
 \centering\small
@@ -287,18 +287,38 @@ $D$ & Direct (s) & Direct mem & PCG iters & PCG (s) & PCG rel.\ err \\
 4096  & 0.367 & 15.6\,MB & 38 & 1.379 & $2.2 \times 10^{-6}$ \\
 \bottomrule
 \end{tabular}
-\caption{Solver comparison at varying RFF dimension $D$. CG iteration counts grow sublinearly with $D$, consistent with $O(\sqrt{\kappa})$ scaling.}
-\label{tab:benchmarks}
+\caption{Synthetic benchmarks at varying RFF dimension $D$. CG iteration counts grow sublinearly with $D$, consistent with the $O(\sqrt{\kappa})$ theoretical bound.}
+\label{tab:benchmarks-synth}
 \end{table}
 
-\paragraph{Honest assessment.} On CPU at Kalle's current scale, direct solve is faster in wall-clock time because LAPACK's Gaussian elimination is extraordinarily well-tuned and $O(D^3)$ remains tractable through $D \sim 10^4$. The advantage of Block-PCG becomes decisive under three conditions, each of which applies to different deployment scenarios:
+\begin{table}[h]
+\centering\small
+\begin{tabular}{@{}lccc@{}}
+\toprule
+Solver (back-end, precision) & Time (ms) & Iterations & Rel.\ err vs direct \\
+\midrule
+Direct (NumPy / LAPACK, Float64) & 2097 & 1 & reference \\
+Block-PCG (NumPy, Float64)       & 6731 & 14 & $4.3 \times 10^{-7}$ \\
+Block-PCG (PyTorch CPU, Float32) & 1704 & 11 & $1.0 \times 10^{-5}$ \\
+Block-PCG (PyTorch MPS / Apple GPU, Float32) & \textbf{1622} & 11 & $1.0 \times 10^{-5}$ \\
+\bottomrule
+\end{tabular}
+\caption{Solver-only benchmarks on the real Kalle training matrices ($D = 6144$, $V = 2977$). The largest speedup comes from switching the BLAS back-end from NumPy to PyTorch (3.95$\times$), not from the GPU per se (additional 1.05$\times$).}
+\label{tab:benchmarks-real}
+\end{table}
+
+\paragraph{Honest assessment.} Three observations deserve emphasis:
+
 \begin{enumerate}
   \setlength\itemsep{0pt}
-  \item \textbf{Very large $D$} ($D \gtrsim 10^4$): memory dominates, and the $O(D^2)$ storage of the direct system exceeds device capacity.
-  \item \textbf{GPU acceleration}: matrix-vector products on GPU are $\sim 10$--$100\times$ faster than on CPU, while \texttt{solve}-style routines parallelize poorly; the crossover shifts to $D \sim 10^3$.
-  \item \textbf{Approximate solutions acceptable}: PCG produces useful $W$ after a handful of iterations, enabling early-stopping as implicit regularization \citep{yao2007early}.
+  \item \textbf{The bigger win is the BLAS back-end, not the GPU.} On this hardware, swapping NumPy for PyTorch (both on CPU) reduces Block-PCG's wall-clock by $4\times$; adding MPS on top contributes only an additional $\sim 5\%$. At $D = 6144$, the problem is still too small for the M-class GPU to cover the host-to-device transfer latency. We expect MPS to dominate at $D \geq 20{,}000$, where direct solve becomes memory-infeasible anyway.
+
+  \item \textbf{A well-implemented Block-PCG (PyTorch CPU) is already faster than the direct solve.} This inverts the naive expectation that iterative solvers are only worthwhile at very large $D$. With modern matrix-product libraries, the $O(\sqrt{\kappa}) \cdot O(D^2 \cdot V)$ cost of CG beats the $O(D^3)$ cost of Gaussian elimination already at Kalle's current scale.
+
+  \item \textbf{Float32 is sufficient.} The PyTorch solvers run in Float32 and differ from the Float64 direct reference by $\sim 10^{-5}$ in relative Frobenius norm. Downstream Top-1 accuracy is unaffected (within sampling noise): the argmax operation over score vectors is robust to this level of precision loss.
 \end{enumerate}
-Kalle v2 ships with both solvers (\texttt{src/build\_v2.py --solver \{direct,cg\}}), enabling future scale-up paths without architectural changes.
+
+For completeness, we note that the linear solve represents only $2$--$7\%$ of Kalle's total training time ($\sim 100$ s end-to-end on this hardware). The remainder is dominated by streaming $Z^\top Z$ accumulation ($\sim 45$ s) and HTML packaging/base64 encoding ($\sim 40$ s). Block-PCG's value at this scale is therefore not a training-time reduction but rather the opening of a GPU scaling path; at larger $D$ where the solve dominates, the speedup becomes primary. Kalle v2 ships with all three NumPy solvers (\texttt{src/build\_v2.py --solver \{direct,cg,power\}}); the PyTorch variants are in \texttt{src/benchmark\_real\_kalle.py} as reference implementations.
 
 
 % ================================================================

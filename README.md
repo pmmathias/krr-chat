@@ -139,7 +139,11 @@ python3 src/build_v2.py --solver=cg --cg-tol=1e-8 --cg-maxiter=2000  # tighter t
 The v2 solver implements the absorber-stochasticization described in the
 [v2 paper](https://doi.org/10.5281/zenodo.19595642) — same result as direct solve,
 but using only matrix-vector products (GPU-ideal, scales to D ≫ 10,000).
-See [`benchmarks/README.md`](benchmarks/README.md) for detailed comparisons.
+See [`benchmarks/README.md`](benchmarks/README.md) for synthetic comparisons and
+[`benchmarks/real_kalle_results.md`](benchmarks/real_kalle_results.md) for the
+full-scale benchmark on actual Kalle training matrices (NumPy vs. PyTorch CPU
+vs. Apple MPS GPU — with a surprising finding: PyTorch's BLAS back-end matters
+more than the GPU at this scale).
 
 ### Run tests
 
