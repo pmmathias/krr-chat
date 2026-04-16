@@ -1,6 +1,16 @@
 # T036: Kalle XL — Experimentelle Variante mit vollem Blog-Korpus
 
-**Status:** TODO
+**Status:** ATTEMPTED — QUALITY THRESHOLD NOT MET
+**Begonnen:** 2026-04-16
+**Abgeschlossen:** 2026-04-16
+
+## Ergebnis
+
+Build-Pipeline funktioniert, aber Qualität reicht nicht. **7/20 (35%) smoke-test pass rate**, Akzeptanz-Kriterium war ≥ 60%. Ausführliche Auswertung in [`VARIANTS.md`](../VARIANTS.md).
+
+**Hauptursache:** Die programmatische Q&A-Generierung in `src/gen_blog_rag_pairs.py` produziert lexikalisch plausible, aber semantisch schwache Pairs. Kernerkenntnis: das v1-Paper-Finding "data quality > data quantity" bestätigt sich empirisch — wir gingen von 2174 → 7302 Pairs und Top-1 fiel von 63.5% → 32.1%.
+
+**Preserve:** Build-Pipeline, Korpus-Generator, Chunk-Index bleiben im Repo für zukünftige Iterationen mit besserer Q&A-Generierung (Option B oder C aus VARIANTS.md).
 **Priorität:** P1 (spannend, aber nicht blockierend für den produktiven Kalle)
 **Geschätzter Aufwand:** 6–8h über mehrere Sessions
 

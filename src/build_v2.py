@@ -42,6 +42,8 @@ parser.add_argument('--cg-maxiter', type=int, default=1000,
                     help='CG maximum iterations (default: 1000)')
 parser.add_argument('--cg-precond', choices=['none', 'diagonal'], default='diagonal',
                     help='CG preconditioner (default: diagonal)')
+parser.add_argument('--D', type=int, default=6144,
+                    help='RFF dimension (default: 6144)')
 args = parser.parse_args()
 print(f"=== Kalle v2 build, solver={args.solver} ===")
 
@@ -51,7 +53,7 @@ print(f"=== Kalle v2 build, solver={args.solver} ===")
 CTX = 24
 EMB_DIM = 32
 FEAT = CTX * EMB_DIM   # 768
-D = 6144
+D = args.D
 SIGMA = 1.5
 LAMBDA = 1e-6
 REPEAT = 5

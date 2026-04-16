@@ -10,9 +10,7 @@ Kalle von Closed-Form-Solve auf iterative GPU-Methode (Power Iteration auf stoch
 
 ## TODO
 
-| # | Ticket | Prio | Aufwand |
-|---|--------|------|---------|
-| [T036](T036_kalle_xl_full_blog.md) | Kalle XL — experimental variant on full DE+EN blog corpus (~3K+ pairs, V≈20K) | P1 | 6–8h |
+(leer)
 
 ## IN PROGRESS
 
@@ -35,6 +33,7 @@ Kalle von Closed-Form-Solve auf iterative GPU-Methode (Power Iteration auf stoch
 | [T032](T032_paper_v2.md) | Paper v2 | 2026-04-16 | 9 Seiten, §5 "Scalable Training", 8 neue Referenzen |
 | [T034](T034_krr_chat_blog_update.md) | KRR-Chat-Blog updaten | 2026-04-16 | Neue Sektion "Scalable training: ridge λ as damping factor" (DE+EN) |
 | [T035](T035_repo_documentation.md) | Repo-Doku updaten | 2026-04-16 | README, ARCHITECTURE.md, CONTENT_SEO_STRATEGY.md aktualisiert |
+| [T036](T036_kalle_xl_full_blog.md) | Kalle XL (experimental) | 2026-04-16 | **7/20 smoke test (35%)** — bestätigt empirisch v1 "less is more". Pipeline ok, aber auto-Q&A zu schwach. Siehe VARIANTS.md |
 
 ## Abhängigkeits-Flow (final)
 

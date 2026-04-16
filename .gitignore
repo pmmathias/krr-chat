@@ -6,3 +6,7 @@ krr-chat-legacy.html
 paper/latex/main.aux
 paper/latex/main.log
 paper/latex/main.out
+# Kalle XL experimental artifact (144 MB) — too large for git
+kalle-xl.html
+data/corpus-xl.md
+data/chunk_index_xl.json
