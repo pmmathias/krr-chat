@@ -1,6 +1,6 @@
 # Content & SEO Strategy: KI-Mathias Academic Publishing
 
-**Stand:** 15. April 2026
+**Stand:** 16. April 2026 (v2 Release)
 **Autor:** Mathias Leonhardt
 **Blog:** https://ki-mathias.de
 
@@ -50,11 +50,18 @@
 | TODO | Status | Details |
 |---|---|---|
 | `src/` mit Build-Pipeline | ✅ | `build.py`, `gen_corpus.py`, `gen_rag_qa.py` |
+| `src/solvers.py` (v2) | ✅ | Block-PCG, Power Iteration, unified solve() entry |
+| `src/build_v2.py` (v2) | ✅ | Pluggable --solver={direct,cg,power} |
+| `src/benchmark.py` (v2) | ✅ | Solver comparison framework |
 | `tests/` mit Regression Suite | ✅ | 34 Playwright-Szenarien |
-| `data/` mit Corpus + Chunks | ✅ | 2178 Pairs, 29 RAG-Chunks |
-| `ARCHITECTURE.md` | ✅ | Pipeline-Diagramm, Bundling-Prozess, Design Decisions |
-| README mit Live-Demo-Button | ✅ | Links zu Demo, Blog, Eigenvalues-Post |
+| `benchmarks/` (v2) | ✅ | Plots + README + results.json |
+| `data/` mit Corpus + Chunks | ✅ | 2174 Pairs, 29 RAG-Chunks |
+| `ARCHITECTURE.md` | ✅ | + Solver-Options-Sektion (v2) |
+| `paper/theory/absorber_stochastisierung.md` (v2) | ✅ | Mathematische Herleitung, 10 Referenzen |
+| README mit Live-Demo-Button | ✅ | + v2 Build-Befehle |
 | GitHub Pages aktiviert | ✅ | `pmmathias.github.io/krr-chat/` |
+| Paper v1 (7 Seiten) | ✅ | Zenodo 10.5281/zenodo.19595642 |
+| **Paper v2 (9 Seiten)** | **✅** | PDF kompiliert; **Zenodo-Upload ausstehend** (s. T033) |
 | Consolidiert auf einen Chatbot | ✅ | `index.html` = Kalle (aktuell, RAG, 2178 Pairs) |
 
 ### 2.4 Profile angelegt

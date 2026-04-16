@@ -125,10 +125,21 @@ pip install numpy gensim
 # Generate corpus (optional — data/corpus.md already included)
 python3 src/gen_corpus.py
 
-# Build HTML (trains Word2Vec → solves KRR → packs into self-contained HTML)
+# v1 build: direct Gaussian elimination (fastest on CPU at current scale)
 python3 src/build.py
 # → produces index.html (~56 MB, all weights embedded, runs in any browser)
+
+# v2 build: pluggable solver (v1-compatible + new iterative paths)
+python3 src/build_v2.py --solver=direct                           # v1-equivalent
+python3 src/build_v2.py --solver=cg                               # Block-PCG (default, GPU-friendly)
+python3 src/build_v2.py --solver=cg --cg-tol=1e-8 --cg-maxiter=2000  # tighter tolerance
+# → produces kalle-chat-v2.html
 ```
+
+The v2 solver implements the absorber-stochasticization described in the
+[v2 paper](https://doi.org/10.5281/zenodo.19595642) — same result as direct solve,
+but using only matrix-vector products (GPU-ideal, scales to D ≫ 10,000).
+See [`benchmarks/README.md`](benchmarks/README.md) for detailed comparisons.
 
 ### Run tests
 

@@ -1,7 +1,9 @@
 # T032: Paper v2 — Überarbeitung mit Power-Iteration-Sektion
 
-**Status:** IN PROGRESS
+**Status:** DONE
 **Begonnen:** 2026-04-16
+**Abgeschlossen:** 2026-04-16
+**Output:** `paper/latex/main.tex` (v2), `paper/latex/leonhardt2026_kalle_krr_chat.pdf` (9 Seiten)
 **Priorität:** P1
 **Geschätzter Aufwand:** 4-5h
 **Abhängig von:** T030 (Benchmarks), T031 (Blog-Schärfung als Referenz)

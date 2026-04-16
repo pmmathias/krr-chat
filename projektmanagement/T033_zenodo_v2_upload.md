@@ -1,6 +1,10 @@
 # T033: Zenodo Update — Paper v2 als neue Version
 
-**Status:** TODO
+**Status:** WAITING (requires manual browser upload)
+**Vorbereitet:** 2026-04-16
+**Anleitung:** `paper/ZENODO_V2_UPLOAD_STEPS.md`
+
+Cross-Updates (citation_doi, README Badge) werden gemacht, sobald Mathias die neue Version-DOI hat.
 **Priorität:** P1
 **Geschätzter Aufwand:** 30 min
 **Abhängig von:** T032

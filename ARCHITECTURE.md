@@ -81,19 +81,69 @@ The answer retrieval is not a neural operation — it's weighted bag-of-words wi
 
 The HTML template contains ~80 lines of matching logic in vanilla JavaScript. The model weights (ω, W, embeddings, pair vectors) are embedded as base64-encoded Float16+gzip blobs. After browser decompression, the full model occupies ~50 MB in GPU memory. No server, no API calls, no dependencies.
 
+## Solver Options (v2)
+
+Kalle v2 introduces a pluggable solver for step 5 of the training pipeline (the linear system solve). All solvers produce mathematically equivalent results — they differ in memory, compute, and scalability properties.
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│ Given: A = Z^TZ + λI  (D×D, SPD)   and   B = Z^TY  (D×V)            │
+│ Find:  W  such that  A·W = B                                         │
+└─────────────────────────────────────────────────────────────────────┘
+            │
+            ├─► --solver=direct
+            │      numpy.linalg.solve (LAPACK, v1 default)
+            │      Memory: O(D²) · V factor storage
+            │      Compute: O(D³) Gaussian elimination
+            │      Best for: D ≤ 10,000 on CPU, exact reproducibility
+            │
+            ├─► --solver=cg
+            │      Block Preconditioned Conjugate Gradient
+            │      Memory: O(D · V) state (R, Z, P, AP matrices)
+            │      Compute: O(D² · V · iters) with iters = O(sqrt(κ))
+            │      Best for: D ≥ 10,000 (memory-bound) or GPU
+            │      Preconditioner: diagonal (Jacobi) — sufficient for
+            │      our well-conditioned RFF approximation
+            │
+            └─► --solver=power (didactic)
+                   Power iteration on absorber-stochasticized matrix
+                   Implements the PageRank-damping analogy exactly
+                   Memory: O(D · V)
+                   Convergence: O(1/λ) — slow for small λ
+                   Best for: illustrating the PageRank ↔ KRR connection
+```
+
+The CG solver is derived in [`paper/theory/absorber_stochastisierung.md`](paper/theory/absorber_stochastisierung.md). The key insight:
+
+**The ridge parameter λ is the same mathematical object as Google's PageRank damping factor d.** Both stabilize the iteration by creating a spectral gap that guarantees convergence. This unification is the central theoretical contribution of [the v2 paper](https://doi.org/10.5281/zenodo.19595642).
+
+Benchmarks across $D \in \{256, 512, 1024, 2048, 4096\}$ show that CG iterations grow sublinearly with $D$ (10 → 38 iterations for $D = 256 → 4096$), validating the $O(\sqrt{\kappa})$ scaling predicted by the convergence analysis. At Kalle's current scale ($D = 6144$), CG converges in 14 iterations with relative Frobenius error $< 10^{-6}$ vs. the direct solve — Top-1 accuracy differs only by sampling noise (62.8% vs. 63.5%). Full details in [`benchmarks/README.md`](benchmarks/README.md).
+
 ## File Structure
 
 ```
 krr-chat/
-├── index.html              # The chatbot — self-contained (~33 MB), GitHub Pages entry point
+├── index.html              # The chatbot — self-contained (~56 MB), GitHub Pages entry point
 ├── README.md
 ├── ARCHITECTURE.md         # ← you are here
 ├── src/
-│   ├── build.py            # Full build pipeline: corpus → Word2Vec → KRR → HTML
+│   ├── build.py            # v1 build pipeline: direct solve (LAPACK)
+│   ├── build_v2.py         # v2 build: pluggable --solver={direct,cg,power}
+│   ├── solvers.py          # Solver library (direct_solve, block_cg, power_iteration_stochastic)
+│   ├── benchmark.py        # Compare solvers across D values
 │   ├── gen_corpus.py       # Curated corpus generator (6 categories, ~2100 pairs)
 │   └── gen_rag_qa.py       # RAG Q&A pair generator from blog chunks
 ├── tests/
 │   └── test_regression.py  # Playwright regression suite (34 scenarios)
+├── benchmarks/
+│   ├── README.md           # Solver comparison + honest analysis
+│   ├── results.json        # Raw benchmark data
+│   └── comparison.png      # Memory/time/iterations plots
+├── paper/
+│   ├── latex/              # LaTeX source (v2, 9 pages)
+│   ├── theory/             # Technical notes (absorber derivation)
+│   └── *.md                # Strategy & publishing docs
+├── projektmanagement/      # Kanban board + tickets (T028–T035)
 └── data/
     ├── corpus.md           # 2174 curated dialog pairs (the training data)
     ├── chunk_index.json    # 29 blog chunks for RAG retrieval

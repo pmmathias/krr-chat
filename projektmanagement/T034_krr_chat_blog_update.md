@@ -1,6 +1,8 @@
 # T034: KRR-Chat-Blogpost updaten (DE+EN) — v2 reflektieren
 
-**Status:** TODO
+**Status:** DONE
+**Abgeschlossen:** 2026-04-16
+**Output:** Neue Sektion "Scalable training: ridge λ as Google's damping factor" in beiden Blog-Versionen. DOI wird bei Concept-DOI belassen (stabil für Version-Upgrades).
 **Priorität:** P2
 **Geschätzter Aufwand:** 2-3h
 **Abhängig von:** T032 (Paper v2), T033 (Zenodo DOI)

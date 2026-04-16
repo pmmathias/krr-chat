@@ -1,6 +1,9 @@
 # T035: Repo-Dokumentation updaten (README, ARCHITECTURE)
 
-**Status:** TODO
+**Status:** DONE
+**Begonnen:** 2026-04-16
+**Abgeschlossen:** 2026-04-16
+**Output:** README.md, ARCHITECTURE.md, CONTENT_SEO_STRATEGY.md mit v2-Sektionen/Referenzen ergänzt.
 **Priorität:** P2
 **Geschätzter Aufwand:** 1-2h
 **Abhängig von:** T029, T030
