@@ -1,6 +1,8 @@
 # T030: Benchmark — v1 (Direct Solve) vs v2 (Iterative)
 
-**Status:** TODO
+**Status:** DONE
+**Abgeschlossen:** 2026-04-16
+**Output:** `src/benchmark.py`, `benchmarks/results.json`, `benchmarks/comparison.png`, `benchmarks/README.md`
 **Priorität:** P0
 **Geschätzter Aufwand:** 2-3h
 **Abhängig von:** T029

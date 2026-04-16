@@ -1,0 +1,82 @@
+[
+  {
+    "D": 256,
+    "V": 500,
+    "lambda_reg": 1e-06,
+    "condition_number": 2.442110374745705,
+    "direct": {
+      "elapsed_sec": 0.0009959936141967773,
+      "peak_mem_MB": 0.9776344299316406
+    },
+    "cg_diagonal": {
+      "iterations": 10,
+      "elapsed_sec": 0.007823824882507324,
+      "peak_mem_MB": 6.8648176193237305,
+      "accuracy_vs_direct": 2.702234681097657e-07
+    }
+  },
+  {
+    "D": 512,
+    "V": 500,
+    "lambda_reg": 1e-06,
+    "condition_number": 3.694043787139513,
+    "direct": {
+      "elapsed_sec": 0.002564072608947754,
+      "peak_mem_MB": 1.9541854858398438
+    },
+    "cg_diagonal": {
+      "iterations": 13,
+      "elapsed_sec": 0.020836472511291504,
+      "peak_mem_MB": 13.7044677734375,
+      "accuracy_vs_direct": 3.32875740240562e-07
+    }
+  },
+  {
+    "D": 1024,
+    "V": 500,
+    "lambda_reg": 1e-06,
+    "condition_number": 6.9397131307828985,
+    "direct": {
+      "elapsed_sec": 0.010564565658569336,
+      "peak_mem_MB": 3.9073104858398438
+    },
+    "cg_diagonal": {
+      "iterations": 18,
+      "elapsed_sec": 0.0697014331817627,
+      "peak_mem_MB": 27.384185791015625,
+      "accuracy_vs_direct": 6.234962033740476e-07
+    }
+  },
+  {
+    "D": 2048,
+    "V": 500,
+    "lambda_reg": 1e-06,
+    "condition_number": 20.309207440249413,
+    "direct": {
+      "elapsed_sec": 0.06058764457702637,
+      "peak_mem_MB": 7.813560485839844
+    },
+    "cg_diagonal": {
+      "iterations": 30,
+      "elapsed_sec": 0.3419623374938965,
+      "peak_mem_MB": 54.743560791015625,
+      "accuracy_vs_direct": 1.5885253121517536e-06
+    }
+  },
+  {
+    "D": 4096,
+    "V": 500,
+    "lambda_reg": 1e-06,
+    "condition_number": 33.48437023798005,
+    "direct": {
+      "elapsed_sec": 0.36729001998901367,
+      "peak_mem_MB": 15.626060485839844
+    },
+    "cg_diagonal": {
+      "iterations": 38,
+      "elapsed_sec": 1.3791885375976562,
+      "peak_mem_MB": 109.46231079101562,
+      "accuracy_vs_direct": 2.1836084905097853e-06
+    }
+  }
+]

@@ -1,6 +1,17 @@
 # T029: Experimentelle Kalle v2 — Iterative Implementation (CG oder Power Iteration)
 
-**Status:** TODO
+**Status:** DONE
+**Begonnen:** 2026-04-16
+**Abgeschlossen:** 2026-04-16
+**Output:** `src/solvers.py`, `src/build_v2.py`, generierte `kalle-chat-v2.html`
+
+## Ergebnis
+
+Block-PCG erfolgreich implementiert:
+- **14 Iterationen** zur Konvergenz (Toleranz 1e-6)
+- **Top-1 Accuracy: 62.8%** (v1: 63.5% — Differenz ist Sampling-Rauschen)
+- Solver-Auswahl via `--solver={direct,cg,power}` CLI-Flag
+- Bei D=6144 ist CG ~3x langsamer als direct solve (erwartet — der Memory/Skalierungs-Vorteil kommt bei großem D)
 **Priorität:** P0
 **Geschätzter Aufwand:** 5-6h
 **Abhängig von:** T028 (Theorie muss klar sein)

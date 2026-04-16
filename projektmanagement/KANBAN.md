@@ -12,9 +12,7 @@ Kalle von Closed-Form-Solve auf iterative GPU-Methode (Power Iteration auf stoch
 
 | # | Ticket | Prio | Abhängig von |
 |---|--------|------|--------------|
-| [T029](T029_experimental_cg_kalle.md) | Experimentelle Kalle v2 — Block-PCG Implementation | P0 | T028 ✓ |
-| [T030](T030_benchmark_v1_vs_v2.md) | Benchmark v1 vs v2 (Memory, Speed, Accuracy, GPU) | P0 | T029 |
-| [T031](T031_eigenvalues_blog_sharpening.md) | Eigenwerte-Blogpost schärfen — Absorber als Algorithmus | P1 | T028 |
+| [T031](T031_eigenvalues_blog_sharpening.md) | Eigenwerte-Blogpost schärfen — Absorber als Algorithmus | P1 | T028 ✓ |
 | [T032](T032_paper_v2.md) | Paper v2 — Überarbeitung mit neuer Sektion | P1 | T030, T031 |
 | [T033](T033_zenodo_v2_upload.md) | Zenodo Update — Paper v2 als neue Version | P1 | T032 |
 | [T034](T034_krr_chat_blog_update.md) | KRR-Chat-Blogpost updaten (DE+EN) | P2 | T032, T033 |
@@ -22,7 +20,9 @@ Kalle von Closed-Form-Solve auf iterative GPU-Methode (Power Iteration auf stoch
 
 ## IN PROGRESS
 
-(leer)
+| # | Ticket | Seit |
+|---|--------|------|
+| [T031](T031_eigenvalues_blog_sharpening.md) | Eigenwerte-Blog schärfen | 2026-04-16 |
 
 ## TESTING
 
@@ -33,6 +33,8 @@ Kalle von Closed-Form-Solve auf iterative GPU-Methode (Power Iteration auf stoch
 | # | Ticket | Abgeschlossen | Highlight |
 |---|--------|---------------|-----------|
 | [T028](T028_theory_absorber_stochastic.md) | Theoretische Ausarbeitung | 2026-04-16 | PCG empfohlen; Absorber-Interpretation als pädagogischer Rahmen |
+| [T029](T029_experimental_cg_kalle.md) | Block-PCG Implementation | 2026-04-16 | `src/solvers.py`, `src/build_v2.py` — 14 iters, Top-1 62.8% |
+| [T030](T030_benchmark_v1_vs_v2.md) | Benchmarks | 2026-04-16 | `benchmarks/*` — ehrliche Aussage: Direct schneller bis D ≤ 4096 auf CPU |
 
 ## Reihenfolge
 

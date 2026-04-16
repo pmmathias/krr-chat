@@ -1,6 +1,7 @@
 # T031: Eigenwerte-Blogpost schärfen — Absorber als Algorithmus, nicht nur Analogie
 
-**Status:** TODO
+**Status:** IN PROGRESS
+**Begonnen:** 2026-04-16
 **Priorität:** P1
 **Geschätzter Aufwand:** 3-4h
 **Abhängig von:** T028
