@@ -10,3 +10,4 @@ paper/latex/main.out
 kalle-xl.html
 data/corpus-xl.md
 data/chunk_index_xl.json
+data/autoregressive/model.pkl
