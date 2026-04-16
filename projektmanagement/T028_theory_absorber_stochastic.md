@@ -1,6 +1,8 @@
 # T028: Theoretische Ausarbeitung — Absorber-Stochastisierung + Power Iteration für KRR
 
-**Status:** TODO
+**Status:** DONE
+**Abgeschlossen:** 2026-04-16
+**Output:** `paper/theory/absorber_stochastisierung.md`
 **Priorität:** P0
 **Geschätzter Aufwand:** 3-4h
 
@@ -40,12 +42,12 @@ machen wir aktuell einen direkten Gauß-Solve. Alternative: Rewrite als Neumann-
 
 ## Akzeptanzkriterien
 
-- [ ] Literatur-Zusammenfassung: 3-5 relevante Referenzen (Power Iteration, Krylov, stochastische Interpretation KRR)
-- [ ] Formale Herleitung der Absorber-Konstruktion für KRR (nicht nur Radiosity)
-- [ ] Klarer Beweis oder Argument: dominanter Eigenvektor von $P$ $\Leftrightarrow$ Regressions-Lösung
-- [ ] Konvergenzrate quantifiziert (in Abhängigkeit von $\lambda$, Spectral Gap)
-- [ ] Klare Empfehlung: **Power Iteration auf stochastisiertem $P$ ODER CG auf $(K+\lambda I)$** — mit Begründung
-- [ ] Dokument `paper/theory/absorber_stochastisierung.md` committed
+- [x] Literatur-Zusammenfassung: 10 Referenzen (Richardson, CG, Nyström, PageRank-Damping, Random-Walk-Kernels)
+- [x] Formale Herleitung der Absorber-Konstruktion für KRR — §3.3
+- [x] Beweis im Anhang A (zeigt: reine Rang-1-Korrektur reicht nicht, PCG empfohlen)
+- [x] Konvergenzrate quantifiziert — Gleichung 11, Vergleichstabelle §6
+- [x] Empfehlung: **Preconditioned Conjugate Gradient (PCG)** als Solver, Absorber als konzeptioneller Rahmen — §5, §7
+- [x] Dokument `paper/theory/absorber_stochastisierung.md` committed
 
 ## Risiken
 

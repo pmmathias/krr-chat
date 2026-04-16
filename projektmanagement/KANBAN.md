@@ -12,8 +12,7 @@ Kalle von Closed-Form-Solve auf iterative GPU-Methode (Power Iteration auf stoch
 
 | # | Ticket | Prio | Abhängig von |
 |---|--------|------|--------------|
-| [T028](T028_theory_absorber_stochastic.md) | Theoretische Ausarbeitung: Absorber + Stochastisierung | P0 | — |
-| [T029](T029_experimental_cg_kalle.md) | Experimentelle Kalle v2 — CG/Power Iteration Implementation | P0 | T028 |
+| [T029](T029_experimental_cg_kalle.md) | Experimentelle Kalle v2 — Block-PCG Implementation | P0 | T028 ✓ |
 | [T030](T030_benchmark_v1_vs_v2.md) | Benchmark v1 vs v2 (Memory, Speed, Accuracy, GPU) | P0 | T029 |
 | [T031](T031_eigenvalues_blog_sharpening.md) | Eigenwerte-Blogpost schärfen — Absorber als Algorithmus | P1 | T028 |
 | [T032](T032_paper_v2.md) | Paper v2 — Überarbeitung mit neuer Sektion | P1 | T030, T031 |
@@ -23,7 +22,7 @@ Kalle von Closed-Form-Solve auf iterative GPU-Methode (Power Iteration auf stoch
 
 ## IN PROGRESS
 
-(noch nichts)
+(leer)
 
 ## TESTING
 
@@ -31,7 +30,9 @@ Kalle von Closed-Form-Solve auf iterative GPU-Methode (Power Iteration auf stoch
 
 ## DONE
 
-(leer)
+| # | Ticket | Abgeschlossen | Highlight |
+|---|--------|---------------|-----------|
+| [T028](T028_theory_absorber_stochastic.md) | Theoretische Ausarbeitung | 2026-04-16 | PCG empfohlen; Absorber-Interpretation als pädagogischer Rahmen |
 
 ## Reihenfolge
 
