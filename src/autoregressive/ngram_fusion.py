@@ -63,8 +63,9 @@ def ngram_log_prob(ngram_model, context_ids, token_id, k=0.1):
     for n in range(min(order, len(context_ids)), 0, -1):
         ctx = tuple(context_ids[-n:])
         ngram = ctx + (token_id,)
-        count = ngram_model['counts'].get(n+1 if n < order else order, {}).get(ngram, 0)
-        ctx_count = ngram_model['context_counts'].get(n+1 if n < order else order, {}).get(ctx, 0)
+        # counts[n] stores (n+1)-grams, context_counts[n] stores n-contexts
+        count = ngram_model['counts'].get(n, {}).get(ngram, 0)
+        ctx_count = ngram_model['context_counts'].get(n, {}).get(ctx, 0)
         if ctx_count > 0:
             # Add-k smoothing
             prob = (count + k) / (ctx_count + k * V)
