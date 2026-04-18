@@ -53,11 +53,18 @@ def parse_args():
 
 def orthogonalize(M):
     """QR-orthogonalize a random matrix. Provably reduces approximation error
-    (Yu et al. 2016, Choromanski et al. 2021 FAVOR+)."""
-    Q, R = torch.linalg.qr(M)
-    # Scale rows by the diagonal of R to preserve expected norm
-    d = torch.diag(R)
-    return Q * d.sign().unsqueeze(0)
+    (Yu et al. 2016, Choromanski et al. 2021 FAVOR+).
+    Handles both tall (rows>=cols) and fat (rows<cols) matrices."""
+    rows, cols = M.shape
+    if rows >= cols:
+        Q, R = torch.linalg.qr(M)
+        d = torch.diag(R)
+        return Q * d.sign().unsqueeze(0)
+    else:
+        # Fat matrix: orthogonalize rows via QR of transpose
+        Q, R = torch.linalg.qr(M.T)
+        d = torch.diag(R)
+        return (Q * d.sign().unsqueeze(0)).T
 
 
 def sinusoidal_pe(max_len, d_emb, device):
