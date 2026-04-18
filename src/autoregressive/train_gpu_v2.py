@@ -95,7 +95,7 @@ def generate_rocket_kernels(n_kernels, kernel_lengths, input_dim, seed=42, devic
         w = rng.standard_normal(klen).astype(np.float32)
         w -= w.mean()  # zero-mean (important for ROCKET)
         # Random bias
-        b = rng.uniform(-1, 1).astype(np.float32)
+        b = np.float32(rng.uniform(-1, 1))
         # Random dilation (exponential distribution, capped)
         max_dilation = max(1, (input_dim - 1) // (klen - 1)) if klen > 1 else 1
         dilation = int(2 ** rng.uniform(0, math.log2(max_dilation + 1)))
