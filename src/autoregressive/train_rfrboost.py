@@ -194,19 +194,13 @@ def main():
     # Start: residual_target = Y (one-hot)
 
     rounds_data = []  # store (omega_k, bias_k, W_k) per round
-    # We track residuals as a dense (D, V) matrix — but we can't store the
-    # full N x V one-hot Y. Instead, we track the residual in the projected space.
+    rff_scale = math.sqrt(2.0 / D)
 
-    # Actually: the residual R = Y - Z·W is in the TOKEN space (N × V).
-    # But we never materialize the full N×V matrix. Instead, for each round:
-    #   ZtR = Z^T R = Z^T Y - Z^T Z W = ZtY_original - ZtZ W
-    # And for the next round's accumulation:
-    #   Z2^T R = Z2^T Y - Z2^T Z1 W1
-    # This requires computing Z2^T Z1 which is D×D — tractable.
-
-    # Simpler approach: just compute the residuals per-batch during accumulation.
-
-    current_predictions = torch.zeros(V, dtype=torch.float32, device=dev)  # not needed globally
+    # KEY INSIGHT: We never need to materialize the N×V residual matrix.
+    # Instead we compute Z_k^T R algebraically:
+    #   Z_k^T R_k = Z_k^T Y - Σᵢ (Z_k^T Zᵢ) Wᵢ
+    # where Z_k^T Y is sparse (standard accumulation) and Z_k^T Zᵢ is D×D
+    # (accumulated in streaming, same cost as Z_k^T Z_k).
 
     print(f"\n{'='*60}")
     print(f"BOOSTING: {args.rounds} rounds")
@@ -219,13 +213,15 @@ def main():
         g_rff = torch.Generator(device='cpu').manual_seed(args.seed + 5000 + round_idx * 100)
         omega_k = (torch.randn(FEAT, D, generator=g_rff) / args.sigma).to(dev)
         bias_k = (torch.rand(D, generator=g_rff) * 2 * math.pi).to(dev)
-        rff_scale = math.sqrt(2.0 / D)
 
-        # Accumulate Z_k^T Z_k and Z_k^T R_k (where R_k is the current residual target)
-        print(f"  Accumulating ZtZ + ZtR (round {round_idx+1})...")
+        # Accumulate Z_k^T Z_k, Z_k^T Y, and Z_k^T Z_i for all previous rounds i
+        print(f"  Accumulating (round {round_idx+1})...")
         t0 = time.time()
-        ZtZ = torch.zeros(D, D, dtype=torch.float64, device=dev)
-        ZtR = torch.zeros(D, V, dtype=torch.float64, device=dev)
+        ZkTZk = torch.zeros(D, D, dtype=torch.float64, device=dev)
+        ZkTY  = torch.zeros(D, V, dtype=torch.float64, device=dev)
+        # Cross-Gram matrices: Z_k^T Z_i for each previous round i
+        cross_grams = [torch.zeros(D, D, dtype=torch.float64, device=dev)
+                       for _ in rounds_data]
 
         for start in range(0, N, BS):
             end = min(start + BS, N)
@@ -233,40 +229,45 @@ def main():
             tgt_batch = all_targets[start:end]
 
             with torch.no_grad():
-                z = rff_scale * torch.cos(feat_batch @ omega_k + bias_k.unsqueeze(0))
-                z64 = z.double()
-                ZtZ += z64.T @ z64
+                # Current round's RFF projection
+                z_k = rff_scale * torch.cos(feat_batch @ omega_k + bias_k.unsqueeze(0))
+                z_k64 = z_k.double()
 
-                # Compute residual target for this batch
-                # residual = one_hot(target) - sum of previous rounds' predictions
+                # Self Gram: Z_k^T Z_k
+                ZkTZk += z_k64.T @ z_k64
+
+                # Z_k^T Y (sparse — only increment target columns)
                 for j in range(end - start):
-                    tid = tgt_batch[j].item()
-                    # One-hot contribution
-                    residual_j = torch.zeros(V, dtype=torch.float64, device=dev)
-                    residual_j[tid] = 1.0
+                    ZkTY[:, tgt_batch[j].item()] += z_k64[j]
 
-                    # Subtract predictions from all previous rounds
-                    for prev_omega, prev_bias, prev_W in rounds_data:
-                        prev_z = rff_scale * torch.cos(feat_batch[j] @ prev_omega + prev_bias).double()
-                        residual_j -= args.shrinkage * (prev_z @ prev_W.double())
+                # Cross Grams: Z_k^T Z_i for each previous round
+                for i, (om_i, bi_i, _) in enumerate(rounds_data):
+                    z_i = rff_scale * torch.cos(feat_batch @ om_i + bi_i.unsqueeze(0))
+                    cross_grams[i] += z_k64.T @ z_i.double()
 
-                    ZtR[:, :] += z64[j].unsqueeze(1) * residual_j.unsqueeze(0)
+            if start % (BS * 10) == 0:
+                elapsed = time.time() - t0
+                pct = 100 * start / N
+                print(f"    {start:>9}/{N:,} ({pct:5.1f}%)  {elapsed:6.1f}s")
 
-            if start % (BS * 20) == 0:
-                print(f"    {start:>9}/{N:,} ({100*start/N:.1f}%)  {time.time()-t0:.1f}s")
+        # Compute Z_k^T R = Z_k^T Y - Σᵢ (Z_k^T Zᵢ) · shrinkage · Wᵢ
+        ZkTR = ZkTY.clone()
+        for i, (_, _, W_i) in enumerate(rounds_data):
+            ZkTR -= args.shrinkage * (cross_grams[i] @ W_i.double())
+        del ZkTY, cross_grams
 
-        ZtZ += args.lam * torch.eye(D, dtype=torch.float64, device=dev)
+        ZkTZk += args.lam * torch.eye(D, dtype=torch.float64, device=dev)
         t_accum = time.time() - t0
         print(f"  Accumulation: {t_accum:.1f}s")
 
         # Solve
         print(f"  Solving round {round_idx+1}...")
         t0 = time.time()
-        W_k, cg_iters = block_cg_gpu(ZtZ.float(), ZtR.float(),
+        W_k, cg_iters = block_cg_gpu(ZkTZk.float(), ZkTR.float(),
                                       tol=args.cg_tol, max_iter=args.cg_maxiter)
         t_solve = time.time() - t0
         print(f"  Solve: {t_solve:.1f}s ({cg_iters} CG iters)")
-        del ZtZ, ZtR
+        del ZkTZk, ZkTR
 
         rounds_data.append((omega_k, bias_k, W_k))
 
