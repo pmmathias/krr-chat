@@ -181,3 +181,60 @@ Sobald die DOI existiert:
 | JOSE Submission | Paper anpassen | ⭐⭐⭐ | Peer-reviewed OA | Rolling |
 
 **Minimaler Aufwand, maximaler Effekt:** Zenodo + Scholar-Tags + ORCID/Scholar-Profil. Das gibt dir eine DOI, Scholar-Indexierung und eine zitierbare Publikation — alles ohne Endorser, ohne Review-Wartezeit, ohne Konferenzreise.
+
+---
+
+## Status-Tracker (Stand: 2026-04-19)
+
+### ✅ Erledigt
+
+| Aktion | Datum | Details |
+|--------|-------|---------|
+| Scholar Meta-Tags im Blog | 2026-04-15 | `citation_*` auf eigenwerte.html + en/eigenvalues.html (Kalle) und gott.html + en/god.html (Coherence) |
+| ORCID Profil | 2026-04-15 | 0009-0009-7154-5351 — Employment, Education, 3 Works gelistet |
+| Google Scholar Profil | 2026-04-15 | Mit Foto, Affiliation, Homepage, Keywords |
+| Zenodo: Kalle Paper | 2026-04-15 | DOI: 10.5281/zenodo.19595642 — 16 Views, 1 Download (Stand 19.04.) |
+| Zenodo: Coherence Paper | 2026-04-15 | DOI: 10.5281/zenodo.19589935 — 15 Views, 2 Downloads (Stand 19.04.) |
+| citation_doi in Blog | 2026-04-15 | Beide DOIs in den jeweiligen Blog-Posts als Meta-Tags |
+| PhilPapers Listing | 2026-04-15 | Coherence Paper gelistet (Metaphysics & Epistemology, Value Theory) |
+| Cross-Linking Blog↔Zenodo↔ORCID↔Scholar | 2026-04-15 | Kreislauf geschlossen |
+| YouTube-Kanal verlinkt in ORCID | 2026-04-15 | Social Links: Blog, GitHub, YouTube, Mastodon |
+| Quora Topic-Credential | 2026-04-16 | "Philosophy of Religion" mit Zenodo-Referenz |
+| dev.to Cross-Posts | 2026-04-19 | Vogelsim + Deepfakes mit canonical_url auf Blog |
+| SEO-Report-Automation | 2026-04-16 | `scripts/seo_report.py` — GSC + YT Analytics + Zenodo + Mastodon + Lighthouse + Bot-Filter |
+
+### ⏳ Offen / In Arbeit
+
+| Aktion | Status | Nächster Schritt |
+|--------|--------|-----------------|
+| arXiv Submission | ❌ braucht Endorser | Endorser in ML-Community suchen (LinkedIn/Mastodon/Meetups). Alternative: HAL (hal.science) als endorser-freie Alternative |
+| EMNLP 2026 Demo Track | ⏳ Deadline noch nicht announced | Paper auf 6 Seiten kürzen, 2.5-Min Screencast-Video produzieren. Voraussichtlich Juli 2026 |
+| JOSE Submission | ⏳ Rolling | Paper auf 2-4 Seiten kürzen, Software-Fokus. Kann jederzeit eingereicht werden |
+| README.md DOI Badge | ✅ bereits vorhanden | Zeile 17 in README.md, Zenodo-Badge verlinkt auf DOI |
+| KRR-Chat Demo verbessern | ⏳ in Arbeit | Eigene Claude-Code-Instanz arbeitet daran. Wenn fertig → Eigenwerte-Post auf dev.to cross-posten |
+| Google Scholar Indexierung | ⏳ automatisch | Dauert 3-6 Monate. Kann nicht beschleunigt werden. |
+| Quora God Debate Space | ⏳ Post submitted | "What if both sides argue about the wrong thing?" — wartet auf Moderator-Review |
+| Show HN | ⏳ Account braucht Karma | Erst 3-5 echte HN-Kommentare, dann Submit. KRR-Chat oder Vogelsim als Demo-URL |
+| Reddit Devvit Game | ⏳ separates Projekt | Vogelsim als eingebettetes Reddit-Game. Eigene Claude-Code-Instanz. |
+
+### 📊 Aktuelle Metriken (19.04.2026)
+
+| Kanal | Metrik |
+|-------|--------|
+| **YouTube** | 302 Lifetime Views, 264 (28d), Tommy=161 Views 🚀 |
+| **Google Search** | 37 sichtbare Query-Impressionen, 4 Clicks, "mathias leonhardt" Pos 2.3 |
+| **Zenodo Kalle** | 16 Views, 1 Download |
+| **Zenodo Coherence** | 15 Views, 2 Downloads |
+| **Mastodon** | 2 Follower, 7 Toots |
+| **dev.to** | 2 Artikel live (Vogelsim + Deepfakes), 0 Reactions (frisch) |
+| **Quora** | 31 Antworten (~70 Views total, low ROI), God Debate Space aktiv |
+| **Reddit** | u/KI-Mathias (Premium), Karma aufbauen läuft |
+| **Lighthouse** | SEO 100/100 auf allen Pages |
+
+### 🎯 Nächste Prioritäten
+
+1. **KRR-Chat fertig verbessern** → dann Eigenwerte-Post auf dev.to (stärkster tech-orientierter Post)
+2. ~~README.md DOI Badge~~ ✅ war schon drin
+3. **Reddit Karma** weiter aufbauen → r/SideProject Post wenn ≥50 Karma
+4. **JOSE evaluieren** — Rolling Submission, kein Deadline-Druck, peer-reviewed
+5. **arXiv Endorser suchen** — Hamburg ML-Meetups, Mastodon ML-Community
