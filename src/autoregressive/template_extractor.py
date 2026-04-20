@@ -106,7 +106,7 @@ def main():
 
         # Mask a random subset
         n_mask = max(2, min(len(maskable), int(len(sent) * args.mask_ratio)))
-        mask_positions = sorted(np.random.choice(maskable, n_mask, replace=False))
+        mask_positions = sorted(list(np.random.choice(maskable, n_mask, replace=False)))
 
         # Build template
         template_tokens = list(sent)
@@ -128,7 +128,7 @@ def main():
         templates.append({
             'token_ids': sent,
             'template_tokens': template_tokens,
-            'mask_positions': mask_positions.tolist(),
+            'mask_positions': list(mask_positions),
             'original_at_masks': original_tokens,
             'original_text': original_text,
             'template_text': template_text,
